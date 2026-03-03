@@ -826,7 +826,7 @@ describe('GeneralTab', () => {
 			const aiModeLabel = screen.getByText('AI Interaction Mode');
 			const aiModeSection = aiModeLabel.closest('.p-3');
 			const toggleButton = aiModeSection?.querySelector('button');
-			expect(toggleButton?.textContent).toBe('Ctrl + Enter');
+			expect(toggleButton?.textContent).toMatch(/(Ctrl|⌘)\s*\+\s*Enter/);
 		});
 
 		it('should toggle enterToSendAI from false to true', async () => {

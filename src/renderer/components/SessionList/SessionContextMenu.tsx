@@ -80,6 +80,16 @@ export function SessionContextMenu({
 		return () => document.removeEventListener('keydown', handleKeyDown);
 	}, []);
 
+	// Cleanup submenu timeout on unmount
+	useEffect(() => {
+		return () => {
+			if (submenuTimeoutRef.current) {
+				clearTimeout(submenuTimeoutRef.current);
+				submenuTimeoutRef.current = null;
+			}
+		};
+	}, []);
+
 	const { left, top, ready } = useContextMenuPosition(menuRef, x, y);
 
 	const handleMoveToGroupHover = () => {
@@ -105,10 +115,23 @@ export function SessionContextMenu({
 	};
 
 	const handleMoveToGroupLeave = () => {
+		if (submenuTimeoutRef.current) {
+			clearTimeout(submenuTimeoutRef.current);
+		}
 		submenuTimeoutRef.current = setTimeout(() => {
 			setShowMoveSubmenu(false);
+			submenuTimeoutRef.current = null;
 		}, 300);
 	};
+
+	// Compute visibility for worktree sections to avoid rendering dividers without buttons
+	const showWorktreeParentSection =
+		(hasWorktreeChildren || session.isGitRepo) &&
+		!session.parentSessionId &&
+		((onQuickCreateWorktree && session.worktreeConfig) || onConfigureWorktrees);
+
+	const showWorktreeChildSection =
+		session.parentSessionId && session.worktreeBranch && (onCreatePR || onDeleteWorktree);
 
 	return (
 		<div
@@ -177,8 +200,20 @@ export function SessionContextMenu({
 				<div
 					ref={moveToGroupRef}
 					className="relative"
+					tabIndex={0}
 					onMouseEnter={handleMoveToGroupHover}
 					onMouseLeave={handleMoveToGroupLeave}
+					onFocus={handleMoveToGroupHover}
+					onBlur={handleMoveToGroupLeave}
+					onKeyDown={(e) => {
+						if (e.key === 'Enter' || e.key === ' ') {
+							e.preventDefault();
+							handleMoveToGroupHover();
+						} else if (e.key === 'Escape' && showMoveSubmenu) {
+							e.stopPropagation();
+							setShowMoveSubmenu(false);
+						}
+					}}
 				>
 					<button
 						className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center justify-between"
@@ -263,41 +298,39 @@ export function SessionContextMenu({
 				</div>
 			)}
 
-			{(hasWorktreeChildren || session.isGitRepo) &&
-				!session.parentSessionId &&
-				(onQuickCreateWorktree || onConfigureWorktrees) && (
-					<>
-						<div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
-						{onQuickCreateWorktree && session.worktreeConfig && (
-							<button
-								onClick={() => {
-									onQuickCreateWorktree();
-									onDismiss();
-								}}
-								className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2"
-								style={{ color: theme.colors.accent }}
-							>
-								<GitBranch className="w-3.5 h-3.5" />
-								Create Worktree
-							</button>
-						)}
-						{onConfigureWorktrees && (
-							<button
-								onClick={() => {
-									onConfigureWorktrees();
-									onDismiss();
-								}}
-								className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2"
-								style={{ color: theme.colors.accent }}
-							>
-								<Settings className="w-3.5 h-3.5" />
-								Configure Worktrees
-							</button>
-						)}
-					</>
-				)}
+			{showWorktreeParentSection && (
+				<>
+					<div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
+					{onQuickCreateWorktree && session.worktreeConfig && (
+						<button
+							onClick={() => {
+								onQuickCreateWorktree();
+								onDismiss();
+							}}
+							className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2"
+							style={{ color: theme.colors.accent }}
+						>
+							<GitBranch className="w-3.5 h-3.5" />
+							Create Worktree
+						</button>
+					)}
+					{onConfigureWorktrees && (
+						<button
+							onClick={() => {
+								onConfigureWorktrees();
+								onDismiss();
+							}}
+							className="w-full text-left px-3 py-1.5 text-xs hover:bg-white/5 transition-colors flex items-center gap-2"
+							style={{ color: theme.colors.accent }}
+						>
+							<Settings className="w-3.5 h-3.5" />
+							Configure Worktrees
+						</button>
+					)}
+				</>
+			)}
 
-			{session.parentSessionId && session.worktreeBranch && (
+			{showWorktreeChildSection && (
 				<>
 					<div className="my-1 border-t" style={{ borderColor: theme.colors.border }} />
 					{onCreatePR && (

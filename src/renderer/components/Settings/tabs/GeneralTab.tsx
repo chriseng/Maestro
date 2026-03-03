@@ -259,7 +259,9 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 		try {
 			const detected = await window.maestro.shells.detect();
 			setShells(detected);
-			setShellsLoaded(true);
+			if (detected && detected.length > 0) {
+				setShellsLoaded(true);
+			}
 		} catch (error) {
 			console.error('Failed to load shells:', error);
 		} finally {
@@ -796,6 +798,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 							}}
 							role="switch"
 							aria-checked={preventSleepEnabled}
+							aria-label="Prevent sleep while working"
 						>
 							<span
 								className={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
@@ -864,6 +867,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 							}}
 							role="switch"
 							aria-checked={disableGpuAcceleration}
+							aria-label="Disable GPU acceleration"
 						>
 							<span
 								className={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
@@ -910,6 +914,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 							}}
 							role="switch"
 							aria-checked={disableConfetti}
+							aria-label="Disable confetti animations"
 						>
 							<span
 								className={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
@@ -995,6 +1000,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 							}}
 							role="switch"
 							aria-checked={statsCollectionEnabled}
+							aria-label="Enable stats collection"
 						>
 							<span
 								className={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
@@ -1169,6 +1175,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 							}}
 							role="switch"
 							aria-checked={wakatimeEnabled}
+							aria-label="Enable WakaTime tracking"
 						>
 							<span
 								className={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
@@ -1207,6 +1214,7 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 								}}
 								role="switch"
 								aria-checked={wakatimeDetailedTracking}
+								aria-label="Detailed file tracking"
 							>
 								<span
 									className={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
@@ -1362,6 +1370,8 @@ export function GeneralTab({ theme, isOpen }: GeneralTabProps) {
 										if (result.errors && result.errors.length > 0) {
 											setSyncError(result.errors.join(', '));
 										}
+									} catch (error) {
+										setSyncError(error instanceof Error ? error.message : String(error));
 									} finally {
 										setSyncMigrating(false);
 									}

@@ -22,6 +22,8 @@ export const SessionTooltipContent = memo(function SessionTooltipContent({
 	contextWarningYellowThreshold = 60,
 	contextWarningRedThreshold = 80,
 }: SessionTooltipContentProps) {
+	const clampedContextUsage = Math.max(0, Math.min(100, session.contextUsage));
+
 	return (
 		<>
 			{groupName && (
@@ -126,7 +128,7 @@ export const SessionTooltipContent = memo(function SessionTooltipContent({
 			>
 				<div className="flex items-center justify-between text-[10px]">
 					<span style={{ color: theme.colors.textDim }}>Context Window</span>
-					<span style={{ color: theme.colors.textMain }}>{session.contextUsage}%</span>
+					<span style={{ color: theme.colors.textMain }}>{clampedContextUsage}%</span>
 				</div>
 				<div
 					className="w-full h-1 rounded-full overflow-hidden"
@@ -135,9 +137,9 @@ export const SessionTooltipContent = memo(function SessionTooltipContent({
 					<div
 						className="h-full transition-all"
 						style={{
-							width: `${session.contextUsage}%`,
+							width: `${clampedContextUsage}%`,
 							backgroundColor: getContextColor(
-								session.contextUsage,
+								clampedContextUsage,
 								theme,
 								contextWarningYellowThreshold,
 								contextWarningRedThreshold
@@ -158,7 +160,7 @@ export const SessionTooltipContent = memo(function SessionTooltipContent({
 
 				{session.usageStats && session.usageStats.totalCostUsd > 0 && (
 					<div className="flex items-center justify-between text-[10px] pt-1">
-						<span style={{ color: theme.colors.textDim }}>Session Cost</span>
+						<span style={{ color: theme.colors.textDim }}>Agent Cost</span>
 						<span className="font-mono font-bold" style={{ color: theme.colors.success }}>
 							${session.usageStats.totalCostUsd.toFixed(2)}
 						</span>
