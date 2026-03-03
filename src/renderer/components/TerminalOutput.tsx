@@ -549,6 +549,7 @@ const LogItemComponent = memo(
 								? safeCommand(toolInput.command) ||
 									safeStr(toolInput.pattern) ||
 									safeStr(toolInput.file_path) ||
+									safeStr(toolInput.filePath) || // OpenCode read tool
 									safeStr(toolInput.query) ||
 									safeStr(toolInput.description) || // Task tool
 									safeStr(toolInput.prompt) || // Task tool fallback
