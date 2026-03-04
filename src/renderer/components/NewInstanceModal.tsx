@@ -967,7 +967,11 @@ export function NewInstanceModal({
 																...(agentConfigs[agent.id] || {}),
 																[key]: value,
 															};
-															window.maestro.agents.setConfig(agent.id, updatedConfig);
+															void window.maestro.agents
+																.setConfig(agent.id, updatedConfig)
+																.catch((error) => {
+																	console.error(`Failed to persist config for ${agent.id}:`, error);
+																});
 														}}
 														availableModels={availableModels[agent.id] || []}
 														loadingModels={loadingModels[agent.id] || false}
@@ -1801,7 +1805,11 @@ export function EditAgentModal({
 										...otherConfig
 									} = updatedConfig;
 									if (Object.keys(otherConfig).length > 0) {
-										window.maestro.agents.setConfig(selectedToolType, otherConfig);
+										void window.maestro.agents
+											.setConfig(selectedToolType, otherConfig)
+											.catch((error) => {
+												console.error(`Failed to persist config for ${selectedToolType}:`, error);
+											});
 									}
 								}}
 								availableModels={availableModels}

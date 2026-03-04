@@ -1004,7 +1004,7 @@ describe('EncoreTab', () => {
 
 			expect(window.maestro.agents.setConfig).toHaveBeenCalledWith(
 				'claude-code',
-				expect.objectContaining({ model: 'claude-3-opus' })
+				expect.objectContaining({ model: 'test-model' })
 			);
 		});
 	});
