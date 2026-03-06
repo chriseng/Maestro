@@ -137,10 +137,14 @@ export function StreamingDocumentPreview({
 	const canPreviewMarkdown = isMarkdownPreviewable(content);
 
 	// Prose styles for markdown preview - scoped to .streaming-preview
-	const proseStyles = generateProseStyles({
-		theme,
-		scopeSelector: '.streaming-preview',
-	});
+	const proseStyles = useMemo(
+		() =>
+			generateProseStyles({
+				theme,
+				scopeSelector: '.streaming-preview',
+			}),
+		[theme]
+	);
 
 	// Markdown components from shared factory (handles SyntaxHighlighter, links, etc.)
 	const markdownComponents = useMemo(

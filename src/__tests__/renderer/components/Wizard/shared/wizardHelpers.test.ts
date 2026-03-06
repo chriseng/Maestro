@@ -14,6 +14,12 @@ describe('wizardHelpers', () => {
 			expect(containsEmoji('🚀')).toBe(true);
 		});
 
+		it('returns true for newer emoji blocks', () => {
+			expect(containsEmoji('🪄 Magic')).toBe(true);
+			expect(containsEmoji('🫠 Melting')).toBe(true);
+			expect(containsEmoji('🪩 Disco')).toBe(true);
+		});
+
 		it('returns false for strings without emoji', () => {
 			expect(containsEmoji('Hello World')).toBe(false);
 			expect(containsEmoji('')).toBe(false);

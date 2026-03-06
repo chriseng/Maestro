@@ -37,7 +37,9 @@ describe('TypingIndicator', () => {
 	function flushRaf(timestamp: number) {
 		const cbs = [...rafCallbacks];
 		rafCallbacks = [];
-		cbs.forEach((cb) => cb(timestamp));
+		for (const cb of cbs) {
+			cb(timestamp);
+		}
 	}
 
 	it('renders with data-testid attributes', () => {
