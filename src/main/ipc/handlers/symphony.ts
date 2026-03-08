@@ -20,6 +20,7 @@ import type { SessionsData, StoredSession } from '../../stores/types';
 import { createIpcHandler, CreateHandlerOptions } from '../../utils/ipcHandler';
 import { execFileNoThrow } from '../../utils/execFile';
 import { getExpandedEnv } from '../../agents/path-prober';
+import { ensureForkSetup } from '../../utils/symphony-fork';
 import {
 	SYMPHONY_REGISTRY_URL,
 	REGISTRY_CACHE_TTL_MS,
@@ -742,7 +743,9 @@ async function createDraftPR(
 	repoPath: string,
 	baseBranch: string,
 	title: string,
-	body: string
+	body: string,
+	upstreamSlug?: string,
+	forkOwner?: string
 ): Promise<{ success: boolean; prUrl?: string; prNumber?: number; error?: string }> {
 	// Check gh authentication first
 	const authCheck = await checkGhAuthentication();
@@ -769,27 +772,37 @@ async function createDraftPR(
 	}
 
 	// Create draft PR using gh CLI (use --head to explicitly specify the branch)
+	const prArgs = [
+		'pr',
+		'create',
+		'--draft',
+		'--base',
+		baseBranch,
+		'--head',
+		// For fork contributions, use "forkOwner:branchName" to specify the fork's branch
+		upstreamSlug && forkOwner ? `${forkOwner}:${branchName}` : branchName,
+		'--title',
+		title,
+		'--body',
+		body,
+	];
+
+	// For fork contributions, target the upstream repo
+	if (upstreamSlug) {
+		prArgs.push('--repo', upstreamSlug);
+	}
+
 	const prResult = await execFileNoThrow(
 		'gh',
-		[
-			'pr',
-			'create',
-			'--draft',
-			'--base',
-			baseBranch,
-			'--head',
-			branchName,
-			'--title',
-			title,
-			'--body',
-			body,
-		],
+		prArgs,
 		repoPath,
 		getExpandedEnv()
 	);
 
 	if (prResult.exitCode !== 0) {
-		// If PR creation failed after push, try to delete the remote branch
+		// If PR creation failed after push, try to delete the remote branch.
+		// Note: In fork mode, `origin` points to the user's fork (set by ensureForkSetup),
+		// so this correctly deletes the branch from the fork, not the upstream repo.
 		logger.warn('PR creation failed, attempting to clean up remote branch', LOG_CONTEXT);
 		await execFileNoThrow('git', ['push', 'origin', '--delete', branchName], repoPath);
 		return { success: false, error: `Failed to create PR: ${prResult.stderr}` };
@@ -1486,6 +1499,13 @@ export function registerSymphonyHandlers({
 					return { error: `Branch creation failed: ${branchResult.error}` };
 				}
 
+				// Set up fork if user doesn't have push access
+				const forkResult = await ensureForkSetup(localPath, repoSlug);
+				if (forkResult.error) {
+					await fs.rm(localPath, { recursive: true, force: true }).catch(() => {});
+					return { error: `Fork setup failed: ${forkResult.error}` };
+				}
+
 				// Create draft PR to claim the issue
 				const prTitle = `[WIP] Symphony: ${issueTitle} (#${issueNumber})`;
 				const prBody = `## Maestro Symphony Contribution
@@ -1501,7 +1521,15 @@ Contributed via [Maestro Symphony](https://runmaestro.ai).
 
 This PR will be updated automatically when the Auto Run completes.`;
 
-				const prResult = await createDraftPR(localPath, baseBranch, prTitle, prBody);
+				const forkOwner = forkResult.isFork ? forkResult.forkSlug?.split('/')[0] : undefined;
+				const prResult = await createDraftPR(
+					localPath,
+					baseBranch,
+					prTitle,
+					prBody,
+					forkResult.isFork ? repoSlug : undefined,
+					forkOwner
+				);
 				if (!prResult.success) {
 					// Cleanup
 					await fs.rm(localPath, { recursive: true, force: true }).catch(() => {});
@@ -1535,6 +1563,11 @@ This PR will be updated automatically when the Auto Run completes.`;
 					timeSpent: 0,
 					sessionId,
 					agentType,
+					isFork: forkResult.isFork,
+					...(forkResult.isFork && {
+						forkSlug: forkResult.forkSlug,
+						upstreamSlug: repoSlug,
+					}),
 				};
 
 				// Save state
@@ -2523,6 +2556,12 @@ This PR will be updated automatically when the Auto Run completes.`;
 						return { success: false, error: `Failed to create branch: ${branchResult.error}` };
 					}
 
+					// 1b. Set up fork if user doesn't have push access
+					const forkResult = await ensureForkSetup(localPath, repoSlug);
+					if (forkResult.error) {
+						return { success: false, error: `Fork setup failed: ${forkResult.error}` };
+					}
+
 					// 2. Set up Auto Run documents directory
 					// External docs (GitHub attachments) go to cache dir to avoid polluting the repo
 					// Repo-internal docs are referenced in place
@@ -2608,6 +2647,11 @@ This PR will be updated automatically when the Auto Run completes.`;
 								resolvedDocs,
 								startedAt: new Date().toISOString(),
 								prCreated: false,
+								isFork: forkResult.isFork,
+								...(forkResult.isFork && {
+									forkSlug: forkResult.forkSlug,
+									upstreamSlug: repoSlug,
+								}),
 							},
 							null,
 							2
@@ -2649,7 +2693,15 @@ Contributed via [Maestro Symphony](https://runmaestro.ai).
 
 This PR will be updated automatically when the Auto Run completes.`;
 
-						const prResult = await createDraftPR(localPath, baseBranch, prTitle, prBody);
+						const forkOwner = forkResult.isFork ? forkResult.forkSlug?.split('/')[0] : undefined;
+						const prResult = await createDraftPR(
+							localPath,
+							baseBranch,
+							prTitle,
+							prBody,
+							forkResult.isFork ? repoSlug : undefined,
+							forkOwner
+						);
 						if (prResult.success) {
 							draftPrNumber = prResult.prNumber;
 							draftPrUrl = prResult.prUrl;
@@ -2749,6 +2801,9 @@ This PR will be updated automatically when the Auto Run completes.`;
 					prCreated: boolean;
 					draftPrNumber?: number;
 					draftPrUrl?: string;
+					isFork?: boolean;
+					forkSlug?: string;
+					upstreamSlug?: string;
 				};
 
 				try {
@@ -2823,7 +2878,15 @@ Contributed via [Maestro Symphony](https://runmaestro.ai).
 This PR will be updated automatically when the Auto Run completes.`;
 
 				// Create draft PR (this also pushes the branch)
-				const prResult = await createDraftPR(localPath, baseBranch, prTitle, prBody);
+				const metaForkOwner = metadata.isFork ? metadata.forkSlug?.split('/')[0] : undefined;
+				const prResult = await createDraftPR(
+					localPath,
+					baseBranch,
+					prTitle,
+					prBody,
+					metadata.isFork ? metadata.upstreamSlug : undefined,
+					metaForkOwner
+				);
 				if (!prResult.success) {
 					logger.error('Failed to create draft PR', LOG_CONTEXT, {
 						contributionId,
