@@ -2257,10 +2257,11 @@ describe('Symphony IPC handlers', () => {
 				const prArgs = prCall![1] as string[];
 				// Should have --head chris:branchName
 				const headIdx = prArgs.indexOf('--head');
+				expect(headIdx).toBeGreaterThanOrEqual(0);
 				expect(prArgs[headIdx + 1]).toMatch(/^chris:/);
 				// Should have --repo owner/repo
 				const repoIdx = prArgs.indexOf('--repo');
-				expect(repoIdx).toBeGreaterThan(-1);
+				expect(repoIdx).toBeGreaterThanOrEqual(0);
 				expect(prArgs[repoIdx + 1]).toBe('owner/repo');
 			});
 		});
@@ -5305,13 +5306,15 @@ describe('Symphony IPC handlers', () => {
 				const prArgs = prCall![1] as string[];
 				// Should have --head chris:branchName
 				const headIdx = prArgs.indexOf('--head');
+				expect(headIdx).toBeGreaterThanOrEqual(0);
 				expect(prArgs[headIdx + 1]).toMatch(/^chris:/);
 				// Should have --repo owner/repo
 				const repoIdx = prArgs.indexOf('--repo');
-				expect(repoIdx).toBeGreaterThan(-1);
+				expect(repoIdx).toBeGreaterThanOrEqual(0);
 				expect(prArgs[repoIdx + 1]).toBe('owner/repo');
 				// Should use upstreamDefaultBranch from metadata as --base
 				const baseIdx = prArgs.indexOf('--base');
+				expect(baseIdx).toBeGreaterThanOrEqual(0);
 				expect(prArgs[baseIdx + 1]).toBe('develop');
 			});
 
@@ -5369,6 +5372,7 @@ describe('Symphony IPC handlers', () => {
 				expect(prArgs).not.toContain('--repo');
 				// --head should be just the branch name, not prefixed
 				const headIdx = prArgs.indexOf('--head');
+				expect(headIdx).toBeGreaterThanOrEqual(0);
 				expect(prArgs[headIdx + 1]).not.toContain(':');
 			});
 
@@ -5431,6 +5435,7 @@ describe('Symphony IPC handlers', () => {
 				expect(prArgs[repoIdx + 1]).toBe('owner/repo');
 				// --head should be just the branch name (no fork owner prefix since no forkSlug)
 				const headIdx = prArgs.indexOf('--head');
+				expect(headIdx).toBeGreaterThanOrEqual(0);
 				expect(prArgs[headIdx + 1]).not.toContain(':');
 			});
 		});
