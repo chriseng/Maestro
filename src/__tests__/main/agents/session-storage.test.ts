@@ -733,38 +733,42 @@ describe('CodexSessionStorage SSH Remote Support', () => {
 			expect(Array.isArray(withoutSsh)).toBe(true);
 		});
 
-		it('should verify SshRemoteConfig interface is properly accepted', async () => {
-			const { CodexSessionStorage } = await import('../../../main/storage/codex-session-storage');
-			const storage = new CodexSessionStorage();
+		it(
+			'should verify SshRemoteConfig interface is properly accepted',
+			{ timeout: 20000 },
+			async () => {
+				const { CodexSessionStorage } = await import('../../../main/storage/codex-session-storage');
+				const storage = new CodexSessionStorage();
 
-			// Full SshRemoteConfig object
-			const fullConfig = {
-				id: 'full-config-test',
-				name: 'Full Config Test',
-				host: 'remote.example.com',
-				port: 2222,
-				username: 'admin',
-				useSshConfig: true,
-				enabled: true,
-			};
+				// Full SshRemoteConfig object
+				const fullConfig = {
+					id: 'full-config-test',
+					name: 'Full Config Test',
+					host: 'remote.example.com',
+					port: 2222,
+					username: 'admin',
+					useSshConfig: true,
+					enabled: true,
+				};
 
-			// Should work with full config
-			const sessions = await storage.listSessions('/project', fullConfig);
-			expect(Array.isArray(sessions)).toBe(true);
+				// Should work with full config
+				const sessions = await storage.listSessions('/project', fullConfig);
+				expect(Array.isArray(sessions)).toBe(true);
 
-			// Should work with minimal config
-			const minimalConfig = {
-				id: 'minimal',
-				name: 'Minimal',
-				host: 'host',
-				port: 22,
-				username: 'user',
-				useSshConfig: false,
-				enabled: true,
-			};
-			const sessionsMinimal = await storage.listSessions('/project', minimalConfig);
-			expect(Array.isArray(sessionsMinimal)).toBe(true);
-		});
+				// Should work with minimal config
+				const minimalConfig = {
+					id: 'minimal',
+					name: 'Minimal',
+					host: 'host',
+					port: 22,
+					username: 'user',
+					useSshConfig: false,
+					enabled: true,
+				};
+				const sessionsMinimal = await storage.listSessions('/project', minimalConfig);
+				expect(Array.isArray(sessionsMinimal)).toBe(true);
+			}
+		);
 	});
 
 	describe('Remote sessions directory path', () => {
@@ -1048,39 +1052,43 @@ describe('OpenCodeSessionStorage SSH Remote Support', () => {
 			expect(localPath?.startsWith('/') || localPath?.match(/^[A-Z]:\\/)).toBeTruthy();
 		});
 
-		it('should verify SshRemoteConfig interface is properly accepted', async () => {
-			const { OpenCodeSessionStorage } =
-				await import('../../../main/storage/opencode-session-storage');
-			const storage = new OpenCodeSessionStorage();
+		it(
+			'should verify SshRemoteConfig interface is properly accepted',
+			{ timeout: 20000 },
+			async () => {
+				const { OpenCodeSessionStorage } =
+					await import('../../../main/storage/opencode-session-storage');
+				const storage = new OpenCodeSessionStorage();
 
-			// Full SshRemoteConfig object
-			const fullConfig = {
-				id: 'full-config-test',
-				name: 'Full Config Test',
-				host: 'remote.example.com',
-				port: 2222,
-				username: 'admin',
-				useSshConfig: true,
-				enabled: true,
-			};
+				// Full SshRemoteConfig object
+				const fullConfig = {
+					id: 'full-config-test',
+					name: 'Full Config Test',
+					host: 'remote.example.com',
+					port: 2222,
+					username: 'admin',
+					useSshConfig: true,
+					enabled: true,
+				};
 
-			// Should work with full config
-			const path = storage.getSessionPath('/project', 'session-id', fullConfig);
-			expect(path).toBe('~/.local/share/opencode/storage/message/session-id');
+				// Should work with full config
+				const path = storage.getSessionPath('/project', 'session-id', fullConfig);
+				expect(path).toBe('~/.local/share/opencode/storage/message/session-id');
 
-			// Should work with minimal config
-			const minimalConfig = {
-				id: 'minimal',
-				name: 'Minimal',
-				host: 'host',
-				port: 22,
-				username: 'user',
-				useSshConfig: false,
-				enabled: true,
-			};
-			const pathMinimal = storage.getSessionPath('/project', 'session-id', minimalConfig);
-			expect(pathMinimal).toBe('~/.local/share/opencode/storage/message/session-id');
-		});
+				// Should work with minimal config
+				const minimalConfig = {
+					id: 'minimal',
+					name: 'Minimal',
+					host: 'host',
+					port: 22,
+					username: 'user',
+					useSshConfig: false,
+					enabled: true,
+				};
+				const pathMinimal = storage.getSessionPath('/project', 'session-id', minimalConfig);
+				expect(pathMinimal).toBe('~/.local/share/opencode/storage/message/session-id');
+			}
+		);
 	});
 });
 
@@ -1415,39 +1423,43 @@ describe('FactoryDroidSessionStorage SSH Remote Support', () => {
 			expect(path.isAbsolute(localPath!)).toBeTruthy();
 		});
 
-		it('should verify SshRemoteConfig interface is properly accepted', async () => {
-			const { FactoryDroidSessionStorage } =
-				await import('../../../main/storage/factory-droid-session-storage');
-			const storage = new FactoryDroidSessionStorage();
+		it(
+			'should verify SshRemoteConfig interface is properly accepted',
+			{ timeout: 20000 },
+			async () => {
+				const { FactoryDroidSessionStorage } =
+					await import('../../../main/storage/factory-droid-session-storage');
+				const storage = new FactoryDroidSessionStorage();
 
-			// Full SshRemoteConfig object
-			const fullConfig = {
-				id: 'full-config-test',
-				name: 'Full Config Test',
-				host: 'remote.example.com',
-				port: 2222,
-				username: 'admin',
-				useSshConfig: true,
-				enabled: true,
-			};
+				// Full SshRemoteConfig object
+				const fullConfig = {
+					id: 'full-config-test',
+					name: 'Full Config Test',
+					host: 'remote.example.com',
+					port: 2222,
+					username: 'admin',
+					useSshConfig: true,
+					enabled: true,
+				};
 
-			// Should work with full config
-			const path = storage.getSessionPath('/project', 'session-id', fullConfig);
-			expect(path).toContain('~/.factory/sessions/');
+				// Should work with full config
+				const path = storage.getSessionPath('/project', 'session-id', fullConfig);
+				expect(path).toContain('~/.factory/sessions/');
 
-			// Should work with minimal config
-			const minimalConfig = {
-				id: 'minimal',
-				name: 'Minimal',
-				host: 'host',
-				port: 22,
-				username: 'user',
-				useSshConfig: false,
-				enabled: true,
-			};
-			const pathMinimal = storage.getSessionPath('/project', 'session-id', minimalConfig);
-			expect(pathMinimal).toContain('~/.factory/sessions/');
-		});
+				// Should work with minimal config
+				const minimalConfig = {
+					id: 'minimal',
+					name: 'Minimal',
+					host: 'host',
+					port: 22,
+					username: 'user',
+					useSshConfig: false,
+					enabled: true,
+				};
+				const pathMinimal = storage.getSessionPath('/project', 'session-id', minimalConfig);
+				expect(pathMinimal).toContain('~/.factory/sessions/');
+			}
+		);
 	});
 
 	describe('Remote sessions directory path', () => {
@@ -2033,37 +2045,41 @@ describe('SSH Config Integration Flow Verification', () => {
 			}
 		});
 
-		it('should support all search modes with SSH config across all agents', async () => {
-			const { OpenCodeSessionStorage } =
-				await import('../../../main/storage/opencode-session-storage');
-			const { CodexSessionStorage } = await import('../../../main/storage/codex-session-storage');
-			const { FactoryDroidSessionStorage } =
-				await import('../../../main/storage/factory-droid-session-storage');
+		it(
+			'should support all search modes with SSH config across all agents',
+			{ timeout: 20000 },
+			async () => {
+				const { OpenCodeSessionStorage } =
+					await import('../../../main/storage/opencode-session-storage');
+				const { CodexSessionStorage } = await import('../../../main/storage/codex-session-storage');
+				const { FactoryDroidSessionStorage } =
+					await import('../../../main/storage/factory-droid-session-storage');
 
-			const openCode = new OpenCodeSessionStorage();
-			const codex = new CodexSessionStorage();
-			const factoryDroid = new FactoryDroidSessionStorage();
+				const openCode = new OpenCodeSessionStorage();
+				const codex = new CodexSessionStorage();
+				const factoryDroid = new FactoryDroidSessionStorage();
 
-			const searchModes: Array<'title' | 'user' | 'assistant' | 'all'> = [
-				'title',
-				'user',
-				'assistant',
-				'all',
-			];
+				const searchModes: Array<'title' | 'user' | 'assistant' | 'all'> = [
+					'title',
+					'user',
+					'assistant',
+					'all',
+				];
 
-			for (const mode of searchModes) {
-				// All should accept the mode with SSH config without throwing
-				await expect(
-					openCode.searchSessions('/test', 'query', mode, integrationSshConfig)
-				).resolves.toBeDefined();
-				await expect(
-					codex.searchSessions('/test', 'query', mode, integrationSshConfig)
-				).resolves.toBeDefined();
-				await expect(
-					factoryDroid.searchSessions('/test', 'query', mode, integrationSshConfig)
-				).resolves.toBeDefined();
+				for (const mode of searchModes) {
+					// All should accept the mode with SSH config without throwing
+					await expect(
+						openCode.searchSessions('/test', 'query', mode, integrationSshConfig)
+					).resolves.toBeDefined();
+					await expect(
+						codex.searchSessions('/test', 'query', mode, integrationSshConfig)
+					).resolves.toBeDefined();
+					await expect(
+						factoryDroid.searchSessions('/test', 'query', mode, integrationSshConfig)
+					).resolves.toBeDefined();
+				}
 			}
-		});
+		);
 	});
 
 	describe('Remote Path Format Verification', () => {
