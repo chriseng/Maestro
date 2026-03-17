@@ -1,17 +1,13 @@
 /**
- * Tests for inlineWizardDocumentGeneration.ts - SSH Remote Support
+ * Tests for phaseGenerator.ts - SSH Remote Support
  *
  * These tests verify that SSH remote IDs are correctly propagated to file operations
- * during document generation.
- *
- * Key mock strategy: The function generates a dynamic session ID internally
- * (`inline-wizard-gen-${Date.now()}-...`), so we capture it from the spawn call
- * and use it when firing onData/onExit callbacks to match the internal guard.
+ * during document generation in the phase generator.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Captured callbacks from onData/onExit registration
+// Captured callbacks from process events
 let capturedDataCallback: ((sessionId: string, data: string) => void) | null = null;
 let capturedExitCallback: ((sessionId: string, code: number) => void) | null = null;
 let capturedFileChangedCallback:
@@ -42,7 +38,7 @@ const mockMaestro = {
 			capturedFileChangedCallback = cb;
 			return vi.fn(); // cleanup function
 		}),
-		listDocs: vi.fn().mockResolvedValue({ success: true, tree: [] }),
+		listDocs: vi.fn().mockResolvedValue({ success: true, files: [] }),
 		writeDoc: vi.fn().mockResolvedValue({ success: true }),
 		readDoc: vi.fn().mockResolvedValue({ success: false }),
 	},
@@ -54,33 +50,28 @@ const mockMaestro = {
 vi.stubGlobal('window', { maestro: mockMaestro });
 
 // Import after mocking
-import { generateInlineDocuments } from '../../../renderer/services/inlineWizardDocumentGeneration';
+import { phaseGenerator } from '../../../../../renderer/components/Wizard/services/phaseGenerator';
 
 /**
- * Configure spawn mock to capture the session ID and fire data + exit callbacks
+ * Configure spawn mock to capture the session ID and fire exit callback
  * with the correct session ID so the internal guards pass.
  */
-function setupSpawnMock(mockOutput: string) {
+function setupSpawnMock(exitDelay = 10) {
 	mockMaestro.process.spawn.mockImplementation(async (config: { sessionId: string }) => {
 		const sid = config.sessionId;
 
-		// Fire data callback with the real session ID (after a microtask to match async flow)
-		setTimeout(() => {
-			if (capturedDataCallback) {
-				capturedDataCallback(sid, mockOutput);
-			}
-		}, 5);
-
-		// Fire exit callback with code 0 (after data arrives)
+		// Fire exit callback with the real session ID (after a delay to match async flow)
 		setTimeout(() => {
 			if (capturedExitCallback) {
 				capturedExitCallback(sid, 0);
 			}
-		}, 15);
+		}, exitDelay);
+
+		return { sessionId: sid };
 	});
 }
 
-describe('inlineWizardDocumentGeneration - SSH Remote Support', () => {
+describe('phaseGenerator - SSH Remote Support', () => {
 	beforeEach(() => {
 		vi.clearAllMocks();
 		capturedDataCallback = null;
@@ -91,78 +82,88 @@ describe('inlineWizardDocumentGeneration - SSH Remote Support', () => {
 	describe('writeDoc operations', () => {
 		it('should pass sshRemoteId to writeDoc when saving documents', async () => {
 			const mockAgent = {
-				id: 'opencode',
+				id: 'claude-code',
 				available: true,
-				command: 'opencode',
+				command: 'claude',
 				args: [],
 			};
 			mockMaestro.agents.get.mockResolvedValue(mockAgent);
 
-			const mockOutput = `
+			// Setup process callbacks
+			mockMaestro.process.spawn.mockImplementation(async () => {
+				// Simulate agent output
+				setTimeout(() => {
+					if (capturedDataCallback) {
+						capturedDataCallback(
+							'test-session',
+							`
 ---BEGIN DOCUMENT---
-FILENAME: Phase-01-Test.md
+FILENAME: Phase-01-Setup.md
 CONTENT:
-# Test Phase
+# Phase 01: Setup
 - [ ] Task 1
 ---END DOCUMENT---
-`;
-			setupSpawnMock(mockOutput);
+`
+						);
+					}
+				}, 10);
 
-			await generateInlineDocuments({
-				agentType: 'opencode',
-				directoryPath: '/remote/path',
-				projectName: 'Test Project',
-				conversationHistory: [],
-				mode: 'new',
-				autoRunFolderPath: '/remote/path/Auto Run Docs',
-				sessionSshRemoteConfig: {
-					enabled: true,
-					remoteId: 'test-remote-id',
-				},
+				setTimeout(() => {
+					if (capturedExitCallback) {
+						capturedExitCallback('test-session', 0);
+					}
+				}, 20);
+
+				return { sessionId: 'test-session' };
 			});
+
+			// Use saveDocuments which calls writeDoc
+			await phaseGenerator.saveDocuments(
+				'/remote/path',
+				[
+					{
+						filename: 'Phase-01-Setup.md',
+						content: '# Test content',
+						taskCount: 1,
+					},
+				],
+				undefined,
+				undefined,
+				'test-remote-id' // sshRemoteId
+			);
 
 			// Verify writeDoc was called with sshRemoteId
 			expect(mockMaestro.autorun.writeDoc).toHaveBeenCalledWith(
-				expect.stringContaining('/remote/path/Auto Run Docs'), // folder path
-				'Phase-01-Test.md', // filename
-				expect.stringContaining('# Test Phase'), // content
-				'test-remote-id' // sshRemoteId (CRITICAL CHECK)
+				expect.stringContaining('/remote/path'),
+				'Phase-01-Setup.md',
+				'# Test content',
+				'test-remote-id' // sshRemoteId
 			);
 		});
 
-		it('should NOT pass sshRemoteId when SSH is disabled', async () => {
+		it('should pass undefined to writeDoc when SSH is disabled', async () => {
 			const mockAgent = {
-				id: 'opencode',
+				id: 'claude-code',
 				available: true,
-				command: 'opencode',
+				command: 'claude',
 				args: [],
 			};
 			mockMaestro.agents.get.mockResolvedValue(mockAgent);
 
-			const mockOutput = `
----BEGIN DOCUMENT---
-FILENAME: Phase-01-Test.md
-CONTENT:
-# Test
-- [ ] Task 1
----END DOCUMENT---
-`;
-			setupSpawnMock(mockOutput);
+			// Use saveDocuments without sshRemoteId
+			await phaseGenerator.saveDocuments('/local/path', [
+				{
+					filename: 'Phase-01-Setup.md',
+					content: '# Test content',
+					taskCount: 1,
+				},
+			]);
 
-			await generateInlineDocuments({
-				agentType: 'opencode',
-				directoryPath: '/local/path',
-				projectName: 'Test Project',
-				conversationHistory: [],
-				mode: 'new',
-				autoRunFolderPath: '/local/path/Auto Run Docs',
-			});
-
-			// Verify writeDoc was called WITHOUT sshRemoteId (undefined)
+			// Verify writeDoc was called with undefined sshRemoteId
 			expect(mockMaestro.autorun.writeDoc).toHaveBeenCalledWith(
-				expect.any(String),
-				expect.any(String),
-				expect.any(String),
+				expect.stringContaining('/local/path'),
+				'Phase-01-Setup.md',
+				'# Test content',
 				undefined // sshRemoteId should be undefined
 			);
 		});
@@ -171,31 +172,22 @@ CONTENT:
 	describe('watchFolder operations', () => {
 		it('should pass sshRemoteId to watchFolder when SSH is enabled', async () => {
 			const mockAgent = {
-				id: 'opencode',
+				id: 'claude-code',
 				available: true,
-				command: 'opencode',
+				command: 'claude',
 				args: [],
 			};
 			mockMaestro.agents.get.mockResolvedValue(mockAgent);
 
-			const mockOutput = `
----BEGIN DOCUMENT---
-FILENAME: Phase-01-Test.md
-CONTENT:
-# Test Phase
-- [ ] Task 1
----END DOCUMENT---
-`;
-			setupSpawnMock(mockOutput);
+			// Setup spawn mock with proper session ID handling
+			setupSpawnMock();
 
-			await generateInlineDocuments({
-				agentType: 'opencode',
+			await phaseGenerator.generateDocuments({
+				agentType: 'claude-code',
 				directoryPath: '/remote/path',
 				projectName: 'Test Project',
 				conversationHistory: [],
-				mode: 'new',
-				autoRunFolderPath: '/remote/path/Auto Run Docs',
-				sessionSshRemoteConfig: {
+				sshRemoteConfig: {
 					enabled: true,
 					remoteId: 'test-remote-id',
 				},
@@ -210,30 +202,21 @@ CONTENT:
 
 		it('should pass undefined to watchFolder when SSH is disabled', async () => {
 			const mockAgent = {
-				id: 'opencode',
+				id: 'claude-code',
 				available: true,
-				command: 'opencode',
+				command: 'claude',
 				args: [],
 			};
 			mockMaestro.agents.get.mockResolvedValue(mockAgent);
 
-			const mockOutput = `
----BEGIN DOCUMENT---
-FILENAME: Phase-01-Test.md
-CONTENT:
-# Test
-- [ ] Task 1
----END DOCUMENT---
-`;
-			setupSpawnMock(mockOutput);
+			// Setup spawn mock with proper session ID handling
+			setupSpawnMock();
 
-			await generateInlineDocuments({
-				agentType: 'opencode',
+			await phaseGenerator.generateDocuments({
+				agentType: 'claude-code',
 				directoryPath: '/local/path',
 				projectName: 'Test Project',
 				conversationHistory: [],
-				mode: 'new',
-				autoRunFolderPath: '/local/path/Auto Run Docs',
 			});
 
 			// Verify watchFolder was called with undefined
@@ -247,58 +230,49 @@ CONTENT:
 	describe('file watcher readFile operations', () => {
 		it('should pass sshRemoteId to readFile in watcher callback when SSH is enabled', async () => {
 			const mockAgent = {
-				id: 'opencode',
+				id: 'claude-code',
 				available: true,
-				command: 'opencode',
+				command: 'claude',
 				args: [],
 			};
 			mockMaestro.agents.get.mockResolvedValue(mockAgent);
 
-			const mockOutput = `
----BEGIN DOCUMENT---
-FILENAME: Phase-01-Test.md
-CONTENT:
-# Test Phase
-- [ ] Task 1
----END DOCUMENT---
-`;
-			setupSpawnMock(mockOutput);
+			// Setup fs.readFile to return content
+			mockMaestro.fs.readFile.mockResolvedValue('# Test content from file');
 
-			// Setup readFile to return content
-			mockMaestro.fs.readFile.mockResolvedValue('# Test content');
+			// Setup spawn mock with proper session ID handling (longer delay to allow watcher setup)
+			setupSpawnMock(100);
 
-			await generateInlineDocuments({
-				agentType: 'opencode',
+			await phaseGenerator.generateDocuments({
+				agentType: 'claude-code',
 				directoryPath: '/remote/path',
 				projectName: 'Test Project',
 				conversationHistory: [],
-				mode: 'new',
-				autoRunFolderPath: '/remote/path/Auto Run Docs',
-				sessionSshRemoteConfig: {
+				sshRemoteConfig: {
 					enabled: true,
 					remoteId: 'test-remote-id',
 				},
 			});
 
-			// Simulate file change event
-			if (capturedFileChangedCallback) {
-				// Capture the actual subfolder path from watchFolder call
-				const watchFolderCall = mockMaestro.autorun.watchFolder.mock.calls[0];
-				const actualSubfolderPath = (watchFolderCall?.[0] as string) || '';
+			// Capture the actual folder path from watchFolder call
+			const watchFolderCall = mockMaestro.autorun.watchFolder.mock.calls[0];
+			const actualFolderPath = (watchFolderCall?.[0] as string) || '';
 
+			// Simulate file change event with the correct folderPath
+			if (capturedFileChangedCallback) {
 				capturedFileChangedCallback({
-					filename: 'Phase-01-Test',
+					filename: 'Phase-01-Setup',
 					eventType: 'rename',
-					folderPath: actualSubfolderPath,
+					folderPath: actualFolderPath,
 				});
 			}
 
 			// Wait for async readFile call
-			await new Promise((resolve) => setTimeout(resolve, 50));
+			await new Promise((resolve) => setTimeout(resolve, 100));
 
 			// Verify readFile was called with sshRemoteId
 			expect(mockMaestro.fs.readFile).toHaveBeenCalledWith(
-				expect.stringContaining('Phase-01-Test.md'),
+				expect.stringContaining('Phase-01-Setup.md'),
 				'test-remote-id' // sshRemoteId
 			);
 		});
@@ -307,16 +281,12 @@ CONTENT:
 	describe('disk fallback operations', () => {
 		it('should pass sshRemoteId to listDocs in disk fallback when SSH is enabled', async () => {
 			const mockAgent = {
-				id: 'opencode',
+				id: 'claude-code',
 				available: true,
-				command: 'opencode',
+				command: 'claude',
 				args: [],
 			};
 			mockMaestro.agents.get.mockResolvedValue(mockAgent);
-
-			// Empty output to trigger disk fallback
-			const mockOutput = '';
-			setupSpawnMock(mockOutput);
 
 			// Setup listDocs to return files
 			mockMaestro.autorun.listDocs.mockResolvedValue({
@@ -330,14 +300,15 @@ CONTENT:
 				content: '# Test content',
 			});
 
-			await generateInlineDocuments({
-				agentType: 'opencode',
+			// Setup spawn mock (empty output to trigger disk fallback)
+			setupSpawnMock();
+
+			await phaseGenerator.generateDocuments({
+				agentType: 'claude-code',
 				directoryPath: '/remote/path',
 				projectName: 'Test Project',
 				conversationHistory: [],
-				mode: 'new',
-				autoRunFolderPath: '/remote/path/Auto Run Docs',
-				sessionSshRemoteConfig: {
+				sshRemoteConfig: {
 					enabled: true,
 					remoteId: 'test-remote-id',
 				},
@@ -355,16 +326,12 @@ CONTENT:
 
 		it('should pass sshRemoteId to readDoc in disk fallback when SSH is enabled', async () => {
 			const mockAgent = {
-				id: 'opencode',
+				id: 'claude-code',
 				available: true,
-				command: 'opencode',
+				command: 'claude',
 				args: [],
 			};
 			mockMaestro.agents.get.mockResolvedValue(mockAgent);
-
-			// Empty output to trigger disk fallback
-			const mockOutput = '';
-			setupSpawnMock(mockOutput);
 
 			// Setup listDocs to return files
 			mockMaestro.autorun.listDocs.mockResolvedValue({
@@ -378,14 +345,15 @@ CONTENT:
 				content: '# Test content',
 			});
 
-			await generateInlineDocuments({
-				agentType: 'opencode',
+			// Setup spawn mock (empty output to trigger disk fallback)
+			setupSpawnMock();
+
+			await phaseGenerator.generateDocuments({
+				agentType: 'claude-code',
 				directoryPath: '/remote/path',
 				projectName: 'Test Project',
 				conversationHistory: [],
-				mode: 'new',
-				autoRunFolderPath: '/remote/path/Auto Run Docs',
-				sessionSshRemoteConfig: {
+				sshRemoteConfig: {
 					enabled: true,
 					remoteId: 'test-remote-id',
 				},
