@@ -13,7 +13,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as path from 'path';
 import * as os from 'os';
 import {
 	expandTilde,
@@ -263,7 +262,9 @@ describe('buildExpandedPath', () => {
 			process.env.PATH = '/opt/homebrew/bin:/usr/bin';
 			const result = buildExpandedPath();
 
-			const pathParts = result.split(path.delimiter);
+			// Use hardcoded ':' since this test models Unix behavior
+			// (path.delimiter is a compile-time constant that doesn't follow process.platform mocks)
+			const pathParts = result.split(':');
 			const homebrewCount = pathParts.filter((p) => p === '/opt/homebrew/bin').length;
 			expect(homebrewCount).toBe(1);
 		});

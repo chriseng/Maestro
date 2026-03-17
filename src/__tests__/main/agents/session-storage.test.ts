@@ -191,8 +191,8 @@ describe('agent-session-storage', () => {
 		});
 
 		it('should implement getSessionPath', () => {
-			const path = storage.getSessionPath('/test/project', 'session-123');
-			expect(path).toBe('/mock/path/session-123.jsonl');
+			const sessionPath = storage.getSessionPath('/test/project', 'session-123');
+			expect(sessionPath).toBe('/mock/path/session-123.jsonl');
 		});
 
 		it('should implement deleteMessagePair', async () => {
@@ -279,11 +279,11 @@ describe('OpenCodeSessionStorage', () => {
 		const storage = new OpenCodeSessionStorage();
 
 		// getSessionPath returns the message directory for the session
-		const path = storage.getSessionPath('/test/project', 'session-123');
-		expect(path).toContain('opencode');
-		expect(path).toContain('storage');
-		expect(path).toContain('message');
-		expect(path).toContain('session-123');
+		const sessionPath = storage.getSessionPath('/test/project', 'session-123');
+		expect(sessionPath).toContain('opencode');
+		expect(sessionPath).toContain('storage');
+		expect(sessionPath).toContain('message');
+		expect(sessionPath).toContain('session-123');
 	});
 
 	it('should fail gracefully when deleting from non-existent session', async () => {
@@ -342,8 +342,8 @@ describe('CodexSessionStorage', () => {
 
 		// getSessionPath is synchronous and always returns null for Codex
 		// Use findSessionFile async method internally
-		const path = storage.getSessionPath('/test/project', 'session-123');
-		expect(path).toBeNull();
+		const sessionPath = storage.getSessionPath('/test/project', 'session-123');
+		expect(sessionPath).toBeNull();
 	});
 
 	it('should fail gracefully when deleting from non-existent session', async () => {
@@ -597,8 +597,8 @@ describe('CodexSessionStorage SSH Remote Support', () => {
 			const storage = new CodexSessionStorage();
 
 			// getSessionPath is synchronous and returns null for Codex (requires async file search)
-			const path = storage.getSessionPath('/test/path', 'session-id', mockSshConfig);
-			expect(path).toBeNull();
+			const sessionPath = storage.getSessionPath('/test/path', 'session-id', mockSshConfig);
+			expect(sessionPath).toBeNull();
 		});
 
 		it('should return null for getSessionPath without SSH config as well', async () => {
@@ -606,8 +606,8 @@ describe('CodexSessionStorage SSH Remote Support', () => {
 			const storage = new CodexSessionStorage();
 
 			// Even without SSH, Codex getSessionPath returns null (needs async lookup)
-			const path = storage.getSessionPath('/test/path', 'session-id');
-			expect(path).toBeNull();
+			const sessionPath = storage.getSessionPath('/test/path', 'session-id');
+			expect(sessionPath).toBeNull();
 		});
 	});
 
@@ -873,9 +873,13 @@ describe('OpenCodeSessionStorage SSH Remote Support', () => {
 				await import('../../../main/storage/opencode-session-storage');
 			const storage = new OpenCodeSessionStorage();
 
-			const path = storage.getSessionPath('/home/testuser/project', 'ses_test123', mockSshConfig);
+			const sessionPath = storage.getSessionPath(
+				'/home/testuser/project',
+				'ses_test123',
+				mockSshConfig
+			);
 
-			expect(path).toBe('~/.local/share/opencode/storage/message/ses_test123');
+			expect(sessionPath).toBe('~/.local/share/opencode/storage/message/ses_test123');
 		});
 
 		it('should return local path when sshConfig is not provided', async () => {
@@ -883,13 +887,13 @@ describe('OpenCodeSessionStorage SSH Remote Support', () => {
 				await import('../../../main/storage/opencode-session-storage');
 			const storage = new OpenCodeSessionStorage();
 
-			const path = storage.getSessionPath('/home/testuser/project', 'ses_test123');
+			const sessionPath = storage.getSessionPath('/home/testuser/project', 'ses_test123');
 
-			expect(path).toContain('opencode');
-			expect(path).toContain('storage');
-			expect(path).toContain('message');
-			expect(path).toContain('ses_test123');
-			expect(path).not.toContain('~'); // Local path should be absolute
+			expect(sessionPath).toContain('opencode');
+			expect(sessionPath).toContain('storage');
+			expect(sessionPath).toContain('message');
+			expect(sessionPath).toContain('ses_test123');
+			expect(sessionPath).not.toContain('~'); // Local path should be absolute
 		});
 	});
 
@@ -1261,11 +1265,15 @@ describe('FactoryDroidSessionStorage SSH Remote Support', () => {
 			const storage = new FactoryDroidSessionStorage();
 
 			// getSessionPath returns the .jsonl file path
-			const path = storage.getSessionPath('/home/testuser/project', 'session-uuid', mockSshConfig);
+			const sessionPath = storage.getSessionPath(
+				'/home/testuser/project',
+				'session-uuid',
+				mockSshConfig
+			);
 
 			// Factory Droid encodes the project path with `-` for `/`
-			expect(path).toContain('~/.factory/sessions/');
-			expect(path).toContain('session-uuid.jsonl');
+			expect(sessionPath).toContain('~/.factory/sessions/');
+			expect(sessionPath).toContain('session-uuid.jsonl');
 		});
 
 		it('should return local path when sshConfig is not provided', async () => {
@@ -1324,13 +1332,17 @@ describe('FactoryDroidSessionStorage SSH Remote Support', () => {
 			const storage = new FactoryDroidSessionStorage();
 
 			// Factory Droid encodes /Users/testuser/project as -Users-testuser-project
-			const path = storage.getSessionPath('/Users/testuser/project', 'session-id', mockSshConfig);
+			const sessionPath = storage.getSessionPath(
+				'/Users/testuser/project',
+				'session-id',
+				mockSshConfig
+			);
 
 			// The path should contain the encoded project directory
-			expect(path).toContain('~/.factory/sessions/');
-			expect(path).toContain('session-id.jsonl');
+			expect(sessionPath).toContain('~/.factory/sessions/');
+			expect(sessionPath).toContain('session-id.jsonl');
 			// The encoded path should be in the directory structure
-			expect(path).toMatch(/~\/\.factory\/sessions\/[^/]+\/session-id\.jsonl/);
+			expect(sessionPath).toMatch(/~\/\.factory\/sessions\/[^/]+\/session-id\.jsonl/);
 		});
 	});
 
@@ -1482,8 +1494,8 @@ describe('FactoryDroidSessionStorage SSH Remote Support', () => {
 			expect(storage.agentId).toBe('factory-droid');
 
 			// getSessionPath should return path starting with ~/.factory/sessions/
-			const path = storage.getSessionPath('/project', 'session-id', mockSshConfig);
-			expect(path).toMatch(/^~\/\.factory\/sessions\//);
+			const sessionPath = storage.getSessionPath('/project', 'session-id', mockSshConfig);
+			expect(sessionPath).toMatch(/^~\/\.factory\/sessions\//);
 		});
 	});
 
@@ -1589,16 +1601,16 @@ describe('SSH Config Integration Flow Verification', () => {
 			];
 
 			for (const testCase of testCases) {
-				const path = storage.getSessionPath(
+				const sessionPath = storage.getSessionPath(
 					testCase.projectPath,
 					testCase.sessionId,
 					integrationSshConfig
 				);
-				expect(path).toBe(testCase.expectedPathPattern);
+				expect(sessionPath).toBe(testCase.expectedPathPattern);
 				// Verify POSIX path format (forward slashes only)
-				expect(path).not.toContain('\\');
+				expect(sessionPath).not.toContain('\\');
 				// Verify home directory expansion format
-				expect(path).toMatch(/^~\//);
+				expect(sessionPath).toMatch(/^~\//);
 			}
 		});
 
@@ -1611,8 +1623,12 @@ describe('SSH Config Integration Flow Verification', () => {
 			expect(storage.agentId).toBe('codex');
 
 			// Verify that SSH config is accepted without errors
-			const path = storage.getSessionPath('/project/path', 'session-id', integrationSshConfig);
-			expect(path).toBeNull(); // Expected - Codex needs async file search
+			const sessionPath = storage.getSessionPath(
+				'/project/path',
+				'session-id',
+				integrationSshConfig
+			);
+			expect(sessionPath).toBeNull(); // Expected - Codex needs async file search
 		});
 
 		it('should construct correct remote paths for Factory Droid storage', async () => {
@@ -1638,18 +1654,18 @@ describe('SSH Config Integration Flow Verification', () => {
 			];
 
 			for (const testCase of testCases) {
-				const path = storage.getSessionPath(
+				const sessionPath = storage.getSessionPath(
 					testCase.projectPath,
 					testCase.sessionId,
 					integrationSshConfig
 				);
-				expect(path).toMatch(testCase.expectedPattern);
+				expect(sessionPath).toMatch(testCase.expectedPattern);
 				// Verify POSIX path format
-				expect(path).not.toContain('\\');
+				expect(sessionPath).not.toContain('\\');
 				// Verify home directory expansion format
-				expect(path).toMatch(/^~\//);
+				expect(sessionPath).toMatch(/^~\//);
 				// Verify .jsonl extension
-				expect(path).toMatch(/\.jsonl$/);
+				expect(sessionPath).toMatch(/\.jsonl$/);
 			}
 		});
 	});
