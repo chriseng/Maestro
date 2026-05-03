@@ -3040,7 +3040,6 @@ function MaestroConsoleInner() {
 						onOpenWizard={openWizardModal}
 						onOpenSettings={() => {
 							setSettingsModalOpen(true);
-							setSettingsTab('general');
 						}}
 						onOpenShortcutsHelp={() => setShortcutsHelpOpen(true)}
 						onOpenAbout={() => setAboutModalOpen(true)}

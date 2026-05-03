@@ -445,7 +445,6 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 			} else if (ctx.isShortcut(e, 'settings')) {
 				e.preventDefault();
 				ctx.setSettingsModalOpen(true);
-				ctx.setSettingsTab('general');
 				trackShortcut('settings');
 			} else if (ctx.isShortcut(e, 'agentSettings')) {
 				// Open agent settings for the current session
