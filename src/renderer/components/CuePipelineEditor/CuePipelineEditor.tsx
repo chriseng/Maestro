@@ -28,6 +28,8 @@ import { usePipelineContextMenu } from '../../hooks/cue/usePipelineContextMenu';
 import { PipelineToolbar } from './PipelineToolbar';
 import { PipelineCanvas, type CanvasInteractionMode } from './PipelineCanvas';
 import { PipelineContextMenu } from './PipelineContextMenu';
+import { notifyCenterFlash } from '../../stores/centerFlashStore';
+import type { TriggerNodeData } from '../../../shared/cue-pipeline-types';
 
 export { validatePipelines, DEFAULT_TRIGGER_LABELS } from '../../hooks/cue/usePipelineState';
 export type { SessionInfo, ActiveRunInfo } from '../../hooks/cue/usePipelineState';
@@ -167,6 +169,8 @@ function CuePipelineEditorInner({
 		runningPipelineIds,
 		runningAgentsByPipeline,
 		runningSubscriptionsByPipeline,
+		optimisticTriggeredPipelineIds,
+		markPipelineTriggered,
 		persistLayout,
 		pendingSavedViewportRef,
 		pipelinesLoaded,
@@ -207,6 +211,43 @@ function CuePipelineEditorInner({
 		onPaneClick,
 		handleConfigureNode,
 	} = selectionHook;
+
+	// Wrap the manual-trigger handler so the click produces immediate UI feedback:
+	//  - Center flash so the user sees acknowledgement before the IPC roundtrip
+	//  - Mark the owning pipeline as optimistically triggered so the trigger
+	//    spinner flips synchronously and every edge in the pipeline animates
+	//    for a brief window — covers fast shell-only triggers that would
+	//    otherwise complete before activeRuns polling caught the run.
+	// Falls through to the original handler so the actual dispatch still goes
+	// through useCue.triggerSubscription (which surfaces success/failure toasts).
+	const handleTriggerPipeline = useCallback(
+		(subscriptionName: string) => {
+			let owningPipelineId: string | null = null;
+			for (const pipeline of pipelineState.pipelines) {
+				for (const node of pipeline.nodes) {
+					if (node.type !== 'trigger') continue;
+					const tData = node.data as TriggerNodeData;
+					// Trigger nodes carry the EXACT sub name they own (incl. -chain-N).
+					// Fall back to pipeline name match for legacy trigger nodes that
+					// were never saved (no `subscriptionName` stamped).
+					if (tData.subscriptionName === subscriptionName || pipeline.name === subscriptionName) {
+						owningPipelineId = pipeline.id;
+						break;
+					}
+				}
+				if (owningPipelineId) break;
+			}
+			if (owningPipelineId) {
+				markPipelineTriggered(owningPipelineId, subscriptionName);
+			}
+			notifyCenterFlash({
+				message: `Triggered "${subscriptionName}"`,
+				color: 'theme',
+			});
+			onTriggerPipeline?.(subscriptionName);
+		},
+		[pipelineState.pipelines, markPipelineTriggered, onTriggerPipeline]
+	);
 
 	// The per-node "Configure" icon calls this directly via node data, bypassing
 	// onNodeClick. In All Pipelines view everything is read-only, so we refuse
@@ -250,7 +291,7 @@ function CuePipelineEditorInner({
 				pipelineState.selectedPipelineId,
 				handleConfigureNodeGuarded,
 				{
-					onTriggerPipeline,
+					onTriggerPipeline: handleTriggerPipeline,
 					isSaved: !isDirty,
 					runningPipelineIds,
 					runningSubscriptionsByPipeline,
@@ -262,7 +303,7 @@ function CuePipelineEditorInner({
 			pipelineState.pipelines,
 			pipelineState.selectedPipelineId,
 			handleConfigureNodeGuarded,
-			onTriggerPipeline,
+			handleTriggerPipeline,
 			isDirty,
 			runningPipelineIds,
 			runningSubscriptionsByPipeline,
@@ -288,12 +329,14 @@ function CuePipelineEditorInner({
 				pipelineState.selectedPipelineId,
 				selectedEdgeId,
 				theme,
-				runningAgentsByPipeline
+				runningAgentsByPipeline,
+				optimisticTriggeredPipelineIds
 			),
 		[
 			pipelineState.pipelines,
 			pipelineState.selectedPipelineId,
 			runningAgentsByPipeline,
+			optimisticTriggeredPipelineIds,
 			selectedEdgeId,
 			theme,
 		]
@@ -452,7 +495,7 @@ function CuePipelineEditorInner({
 				selectedEdgePipelineColor={selectedEdgePipelineColor}
 				onUpdateEdge={onUpdateEdge}
 				onDeleteEdge={onDeleteEdge}
-				onTriggerPipeline={onTriggerPipeline}
+				onTriggerPipeline={handleTriggerPipeline}
 				isDirty={isDirty}
 				runningPipelineIds={runningPipelineIds}
 				isLoading={graphLoading || (graphSessions.length > 0 && !pipelinesLoaded)}

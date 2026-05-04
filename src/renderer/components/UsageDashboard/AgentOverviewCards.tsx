@@ -10,8 +10,7 @@
  * visually distinguishable at a glance.
  */
 
-import { memo, useMemo } from 'react';
-import { BarChart2 } from 'lucide-react';
+import { memo, useMemo, useState } from 'react';
 import type { Session, SessionState, Theme } from '../../types';
 import type { StatsAggregation } from '../../hooks/stats/useStats';
 import { Sparkline } from './Sparkline';
@@ -114,9 +113,9 @@ interface AgentCardProps {
 	isSelected: boolean;
 	/** All visible sessions; needed to disambiguate the provider-fallback count */
 	visibleSessions: Session[];
-	/** Click handler for the per-card "view stats" icon button. When provided, a
-	 *  BarChart2 icon renders in the card header and clicking it opens the
-	 *  per-agent stats sub-modal. */
+	/** Click handler for the entire card. When provided, the tile becomes a
+	 *  button that opens the per-agent stats sub-modal and gains a hover
+	 *  affordance to signal clickability. */
 	onShowDetails?: (session: Session) => void;
 }
 
@@ -132,6 +131,8 @@ const AgentCard = memo(function AgentCard({
 	const isWorktree = Boolean(session.parentSessionId);
 	const isBusy = session.state === 'busy';
 	const statusColor = getStatusColor(session.state, theme);
+	const isClickable = Boolean(onShowDetails);
+	const [isHovered, setIsHovered] = useState(false);
 
 	const { queryCount, sparklineData } = useMemo(() => {
 		const sessionByDay = data.bySessionByDay?.[session.id];
@@ -142,33 +143,62 @@ const AgentCard = memo(function AgentCard({
 		};
 	}, [data, session, visibleSessions]);
 
+	const tabCount = session.aiTabs?.length ?? 0;
 	const sparklineColor = isWorktree ? theme.colors.accent : statusColor;
 
 	// When the dashboard filter selects this card's agent, the 1px default
 	// border is replaced with a 2px solid accent border. Worktree dashing is
 	// suppressed for the duration — the highlight outranks the worktree
 	// affordance, and the existing "WT" badge keeps the worktree distinction
-	// visible.
+	// visible. While hovered (clickable cards only), we promote the border to
+	// the accent color so the tile reads as actionable.
 	const border = isSelected
 		? `2px solid ${theme.colors.accent}`
-		: isWorktree
-			? `1px dashed ${theme.colors.accent}99`
-			: `1px solid ${theme.colors.border}`;
+		: isHovered && isClickable
+			? `1px solid ${theme.colors.accent}`
+			: isWorktree
+				? `1px dashed ${theme.colors.accent}99`
+				: `1px solid ${theme.colors.border}`;
+	const backgroundColor =
+		isHovered && isClickable ? `${theme.colors.accent}12` : theme.colors.bgActivity;
+
+	const handleClick = onShowDetails ? () => onShowDetails(session) : undefined;
+	const handleKeyDown = onShowDetails
+		? (e: React.KeyboardEvent<HTMLDivElement>) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					onShowDetails(session);
+				}
+			}
+		: undefined;
+
+	const baseAriaLabel = `${session.name}, ${session.state}, ${queryCount} ${
+		queryCount === 1 ? 'query' : 'queries'
+	}, ${tabCount} ${tabCount === 1 ? 'tab' : 'tabs'}`;
+	const ariaLabel = isClickable ? `${baseAriaLabel}. View detailed stats.` : baseAriaLabel;
 
 	return (
 		<div
-			className="card-enter relative p-3 rounded-lg flex flex-col gap-1.5"
+			className={`card-enter relative p-3 rounded-lg flex flex-col gap-1.5 transition-colors ${
+				isClickable ? 'cursor-pointer focus:outline-none focus-visible:ring-2' : ''
+			}`}
 			style={{
-				backgroundColor: theme.colors.bgActivity,
+				backgroundColor,
 				border,
 				animationDelay: `${animationIndex * 60}ms`,
+				transitionDuration: '120ms',
+				...(isClickable ? ({ '--tw-ring-color': theme.colors.accent } as React.CSSProperties) : {}),
 			}}
 			data-testid="agent-card"
 			data-selected={isSelected ? 'true' : undefined}
-			role="group"
-			aria-label={`${session.name}, ${session.state}, ${queryCount} ${
-				queryCount === 1 ? 'query' : 'queries'
-			}`}
+			data-clickable={isClickable ? 'true' : undefined}
+			role={isClickable ? 'button' : 'group'}
+			tabIndex={isClickable ? 0 : undefined}
+			onClick={handleClick}
+			onKeyDown={handleKeyDown}
+			onMouseEnter={isClickable ? () => setIsHovered(true) : undefined}
+			onMouseLeave={isClickable ? () => setIsHovered(false) : undefined}
+			aria-label={ariaLabel}
 		>
 			<div className="flex items-center gap-2 min-w-0">
 				<span
@@ -199,30 +229,6 @@ const AgentCard = memo(function AgentCard({
 						WT
 					</span>
 				)}
-				{onShowDetails && (
-					<button
-						type="button"
-						onClick={() => onShowDetails(session)}
-						className="flex-shrink-0 p-0.5 rounded transition-colors"
-						style={{
-							color: theme.colors.textDim,
-							backgroundColor: 'transparent',
-						}}
-						onMouseEnter={(e) => {
-							e.currentTarget.style.color = theme.colors.accent;
-							e.currentTarget.style.backgroundColor = `${theme.colors.accent}15`;
-						}}
-						onMouseLeave={(e) => {
-							e.currentTarget.style.color = theme.colors.textDim;
-							e.currentTarget.style.backgroundColor = 'transparent';
-						}}
-						title={`View detailed stats for ${session.name}`}
-						aria-label={`View detailed stats for ${session.name}`}
-						data-testid="agent-card-details-button"
-					>
-						<BarChart2 className="w-3.5 h-3.5" />
-					</button>
-				)}
 			</div>
 			{isWorktree && session.worktreeBranch && (
 				<div
@@ -235,20 +241,37 @@ const AgentCard = memo(function AgentCard({
 				</div>
 			)}
 			<div className="flex items-end justify-between gap-2 mt-auto">
-				<div className="flex flex-col min-w-0">
-					<span
-						className="text-[9px] uppercase tracking-wide"
-						style={{ color: theme.colors.textDim }}
-					>
-						Queries
-					</span>
-					<span
-						className="text-base font-semibold"
-						style={{ color: theme.colors.textMain }}
-						data-testid="agent-card-query-count"
-					>
-						{queryCount}
-					</span>
+				<div className="flex items-end gap-3 min-w-0">
+					<div className="flex flex-col min-w-0">
+						<span
+							className="text-[9px] uppercase tracking-wide"
+							style={{ color: theme.colors.textDim }}
+						>
+							Queries
+						</span>
+						<span
+							className="text-base font-semibold"
+							style={{ color: theme.colors.textMain }}
+							data-testid="agent-card-query-count"
+						>
+							{queryCount}
+						</span>
+					</div>
+					<div className="flex flex-col min-w-0">
+						<span
+							className="text-[9px] uppercase tracking-wide"
+							style={{ color: theme.colors.textDim }}
+						>
+							Tabs
+						</span>
+						<span
+							className="text-base font-semibold"
+							style={{ color: theme.colors.textMain }}
+							data-testid="agent-card-tab-count"
+						>
+							{tabCount}
+						</span>
+					</div>
 				</div>
 				<div className="flex-shrink-0 opacity-80 pointer-events-none">
 					<Sparkline data={sparklineData} color={sparklineColor} width={70} height={22} />

@@ -440,13 +440,21 @@ export function convertToReactFlowNodes(
  *
  * Non-agent targets (cli_output, error nodes) never animate — they don't
  * correspond to a dispatchable run.
+ *
+ * Optimistic-trigger override: when a pipeline appears in
+ * `optimisticTriggeredPipelineIds`, every edge in that pipeline is flagged
+ * `isRunning` for the brief optimistic window after a manual Play click. This
+ * gives instant "your click registered" feedback even before any agent has
+ * spun up — useful for sub-second shell-only triggers that would otherwise
+ * complete before the per-agent rule could light anything up.
  */
 export function convertToReactFlowEdges(
 	pipelines: CuePipelineState['pipelines'],
 	selectedPipelineId: string | null,
 	selectedEdgeId?: string | null,
 	theme?: Theme,
-	runningAgentsByPipeline?: Map<string, Set<string>>
+	runningAgentsByPipeline?: Map<string, Set<string>>,
+	optimisticTriggeredPipelineIds?: Set<string>
 ): Edge[] {
 	const edges: Edge[] = [];
 
@@ -460,6 +468,7 @@ export function convertToReactFlowEdges(
 		if (!isActive) continue;
 
 		const runningAgents = runningAgentsByPipeline?.get(pipeline.id);
+		const isOptimisticallyTriggered = !!optimisticTriggeredPipelineIds?.has(pipeline.id);
 		// Build node lookup once per pipeline so the per-edge target lookup is O(1).
 		const nodeById = new Map<string, (typeof pipeline.nodes)[number]>();
 		for (const n of pipeline.nodes) nodeById.set(n.id, n);
@@ -470,7 +479,8 @@ export function convertToReactFlowEdges(
 			const targetSessionName =
 				targetNode?.type === 'agent' ? (targetNode.data as AgentNodeData).sessionName : undefined;
 			const isRunning =
-				!!targetSessionName && !!runningAgents && runningAgents.has(targetSessionName);
+				isOptimisticallyTriggered ||
+				(!!targetSessionName && !!runningAgents && runningAgents.has(targetSessionName));
 
 			const edgeData: PipelineEdgeData = {
 				pipelineColor: pipeline.color,

@@ -1018,6 +1018,61 @@ describe('convertToReactFlowEdges — per-agent edge animation', () => {
 		const edges = convertToReactFlowEdges([pipeline], 'p1', undefined, undefined, running);
 		expect(edges).toEqual([]);
 	});
+
+	it('optimistic-trigger override: every edge in the pipeline animates regardless of target type', () => {
+		// Pipeline with a non-agent leg (trigger → command → agent). Without the
+		// optimistic flag the trigger→command edge cannot animate (target isn't
+		// an agent). With the flag, both legs animate so the user sees instant
+		// feedback after clicking Play, even for fast shell-only triggers.
+		const pipeline = makePipeline('p1', {
+			nodes: [
+				makeTrigger('t1', 'time.heartbeat'),
+				makeAgent('a', 'sess-a', 'A'), // re-using makeAgent for non-agent target stand-in is wrong
+			],
+			edges: [makeEdge('e1', 't1', 'a')],
+		});
+		// Baseline: no animation when neither agent is running and no optimistic flag.
+		const baseline = convertToReactFlowEdges([pipeline], 'p1', undefined, undefined, new Map());
+		expect((baseline[0].data as { isRunning: boolean }).isRunning).toBe(false);
+
+		// With optimistic set including this pipeline, the edge animates.
+		const optimistic = new Set(['p1']);
+		const animated = convertToReactFlowEdges(
+			[pipeline],
+			'p1',
+			undefined,
+			undefined,
+			new Map(),
+			optimistic
+		);
+		expect((animated[0].data as { isRunning: boolean }).isRunning).toBe(true);
+	});
+
+	it('optimistic-trigger override: only flagged pipelines animate (others remain static)', () => {
+		const pA = makePipeline('pA', {
+			nodes: [makeTrigger('tA', 'time.heartbeat'), makeAgent('a', 'sess-a', 'A')],
+			edges: [makeEdge('eA', 'tA', 'a')],
+		});
+		const pB = makePipeline('pB', {
+			nodes: [makeTrigger('tB', 'time.heartbeat'), makeAgent('b', 'sess-b', 'B')],
+			edges: [makeEdge('eB', 'tB', 'b')],
+		});
+		const optimistic = new Set(['pA']);
+		const edges = convertToReactFlowEdges(
+			[pA, pB],
+			null,
+			undefined,
+			undefined,
+			new Map(),
+			optimistic
+		);
+		expect((edges.find((e) => e.id === 'pA:eA')!.data as { isRunning: boolean }).isRunning).toBe(
+			true
+		);
+		expect((edges.find((e) => e.id === 'pB:eB')!.data as { isRunning: boolean }).isRunning).toBe(
+			false
+		);
+	});
 });
 
 describe('convertToReactFlowNodes triggerOptions', () => {
