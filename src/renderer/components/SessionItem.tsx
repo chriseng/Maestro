@@ -265,14 +265,6 @@ export const SessionItem = memo(function SessionItem({
 								{worktreeChildCount}
 							</span>
 						)}
-						{/* Bookmark icon (only in bookmark variant, always filled) */}
-						{variant === 'bookmark' && session.bookmarked && (
-							<Bookmark
-								className="w-3 h-3 shrink-0"
-								style={{ color: theme.colors.accent }}
-								fill={theme.colors.accent}
-							/>
-						)}
 						{/* Branch icon for worktree children */}
 						{variant === 'worktree' && (
 							<GitBranch className="w-3 h-3 shrink-0" style={{ color: theme.colors.accent }} />

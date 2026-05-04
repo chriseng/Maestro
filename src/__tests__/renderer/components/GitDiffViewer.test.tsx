@@ -127,14 +127,35 @@ describe('GitDiffViewer', () => {
 		vi.clearAllMocks();
 		// Default: return empty array (no files)
 		mockParseGitDiff.mockReturnValue([]);
-		// View-type preference is persisted to localStorage; reset between tests
-		// so cases don't bleed state into each other.
-		window.localStorage.removeItem('maestro.gitDiffViewer.viewType');
+		// jsdom in this environment doesn't provide a working Storage on
+		// window.localStorage, so install a minimal in-memory mock that
+		// satisfies the Storage methods the component uses. Same pattern as
+		// ProcessMonitor.test.tsx / QuickActionsModal.test.tsx.
+		const store = new Map<string, string>();
+		Object.defineProperty(window, 'localStorage', {
+			configurable: true,
+			writable: true,
+			value: {
+				getItem: vi.fn((key: string) => (store.has(key) ? store.get(key)! : null)),
+				setItem: vi.fn((key: string, value: string) => {
+					store.set(key, String(value));
+				}),
+				removeItem: vi.fn((key: string) => {
+					store.delete(key);
+				}),
+				clear: vi.fn(() => {
+					store.clear();
+				}),
+				key: vi.fn((index: number) => Array.from(store.keys())[index] ?? null),
+				get length() {
+					return store.size;
+				},
+			},
+		});
 	});
 
 	afterEach(() => {
 		vi.clearAllMocks();
-		window.localStorage.removeItem('maestro.gitDiffViewer.viewType');
 	});
 
 	describe('Initial render', () => {
@@ -1563,7 +1584,7 @@ describe('GitDiffViewer', () => {
 		it('documents the Enter shortcut in the footer with the opposite view label', () => {
 			mockParseGitDiff.mockReturnValue([createMockParsedFile()]);
 
-			const { rerender } = render(
+			const { unmount } = render(
 				<GitDiffViewer
 					diffText="mock diff"
 					cwd="/test/project"
@@ -1575,8 +1596,11 @@ describe('GitDiffViewer', () => {
 
 			expect(screen.getByText(/to toggle side-by-side view/i)).toBeInTheDocument();
 
+			// The persisted preference is read by the useState initializer, which
+			// only runs on mount — so unmount and remount to pick up the change.
+			unmount();
 			window.localStorage.setItem(STORAGE_KEY, 'split');
-			rerender(
+			render(
 				<GitDiffViewer
 					diffText="mock diff (alt)"
 					cwd="/test/project"
