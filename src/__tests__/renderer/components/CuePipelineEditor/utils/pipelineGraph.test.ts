@@ -565,6 +565,31 @@ describe('convertToReactFlowNodes', () => {
 		}
 	});
 
+	it('marks pipeline-group nodes non-draggable in hand (pan) mode', () => {
+		const p1 = makePipeline('p1', {
+			color: '#aabbcc',
+			nodes: [makeTrigger('t1', 'time.heartbeat', {}, { x: 0, y: 0 })],
+		});
+		const p2 = makePipeline('p2', {
+			color: '#ddeeff',
+			nodes: [makeTrigger('t2', 'file.changed', {}, { x: 0, y: 0 })],
+		});
+		const nodes = convertToReactFlowNodes(
+			[p1, p2],
+			null,
+			undefined,
+			undefined,
+			undefined,
+			undefined,
+			true
+		);
+		const groups = nodes.filter((n) => n.type === 'pipeline-group');
+		expect(groups).toHaveLength(2);
+		for (const g of groups) {
+			expect(g.draggable).toBe(false);
+		}
+	});
+
 	it('skips pipeline-group nodes for empty pipelines', () => {
 		const p1 = makePipeline('p1', {
 			nodes: [makeTrigger('t1', 'time.heartbeat')],

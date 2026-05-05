@@ -291,7 +291,8 @@ function CuePipelineEditorInner({
 					runningAgentsByPipeline,
 				},
 				theme,
-				stableYOffsets
+				stableYOffsets,
+				interactionMode === 'hand'
 			),
 		[
 			pipelineState.pipelines,
@@ -304,6 +305,7 @@ function CuePipelineEditorInner({
 			runningAgentsByPipeline,
 			theme,
 			stableYOffsets,
+			interactionMode,
 		]
 	);
 

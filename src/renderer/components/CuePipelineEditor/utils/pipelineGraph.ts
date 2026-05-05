@@ -276,7 +276,11 @@ export function convertToReactFlowNodes(
 	theme?: Theme,
 	/** Pre-computed Y-offsets to use instead of recomputing from bounding boxes.
 	 *  Passed during drag so rendering uses the same offsets as onNodesChange. */
-	frozenYOffsets?: Map<string, number> | null
+	frozenYOffsets?: Map<string, number> | null,
+	/** When true, the canvas is in pan (hand) mode. Pipeline group nodes opt
+	 *  out of dragging so a left-drag on the group's empty area pans the
+	 *  canvas instead of moving the whole pipeline. */
+	isHandMode?: boolean
 ): Node[] {
 	const nodes: Node[] = [];
 
@@ -321,10 +325,13 @@ export function convertToReactFlowNodes(
 				},
 				data: groupData,
 				selectable: false,
-				// Group is the user-grabbable handle for the whole pipeline.
-				// ReactFlow honors per-node `draggable` even when the global
-				// `nodesDraggable` is false (which it is in All Pipelines view).
-				draggable: true,
+				// Group is the user-grabbable handle for the whole pipeline in
+				// pointer/select mode. ReactFlow honors per-node `draggable`
+				// even when the global `nodesDraggable` is false (which it is
+				// in All Pipelines view). In hand/pan mode we opt out so a
+				// left-drag on the group's empty area falls through to canvas
+				// pan — pan tool should never move groups.
+				draggable: !isHandMode,
 				focusable: false,
 				zIndex: -1,
 			});
