@@ -14,10 +14,15 @@
  *     path: if a user fixes file permissions or writes a missing key and
  *     immediately retries, they must see a fresh check, not a stale `false`.
  *
- * SRP: this module caches a boolean predicate result. It does not perform
- * the access itself — the caller passes the access function. This keeps
- * `fs.accessSync` out of the cache and lets tests inject any predicate.
+ * SRP: the cache class itself does not perform the access — callers pass an
+ * access function. The default probe is exported alongside (rather than
+ * embedded in `check()`) so the cache stays a pure predicate-cache and
+ * tests can still inject any boolean function. SOC: production deps in
+ * SSH modules import {@link defaultReadableProbe} once instead of each
+ * carrying their own try/`accessSync`/catch copy.
  */
+
+import * as fs from 'fs';
 
 export interface PathAccessCacheEntry {
 	readable: true;
@@ -25,6 +30,25 @@ export interface PathAccessCacheEntry {
 }
 
 export const DEFAULT_PATH_ACCESS_TTL_MS = 30_000;
+
+/**
+ * Default synchronous read-permission probe. Returns `true` iff the path
+ * exists AND is readable by the current process; swallows ENOENT/EACCES/
+ * etc. as `false`.
+ *
+ * Shared by every SSH `defaultDeps` site so the try/`accessSync`/catch
+ * pattern lives in exactly one place. Tests that wire their own
+ * `checkFileAccess` / `fileExists` predicate via DI bypass this entirely
+ * — the helper is only used by production deps.
+ */
+export function defaultReadableProbe(filePath: string): boolean {
+	try {
+		fs.accessSync(filePath, fs.constants.R_OK);
+		return true;
+	} catch {
+		return false;
+	}
+}
 
 export class PathAccessCache {
 	private cache = new Map<string, PathAccessCacheEntry>();

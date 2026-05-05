@@ -11,7 +11,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { expandTilde } from '../../shared/pathUtils';
-import { getPathAccessCache } from './path-access-cache';
+import { getPathAccessCache, defaultReadableProbe } from './path-access-cache';
 
 /**
  * Parsed SSH config host entry.
@@ -67,22 +67,10 @@ export interface SshConfigParserDeps {
 }
 
 /**
- * Synchronous read-perm probe. Production deps wrap this in
- * {@link PathAccessCache} so consecutive `parseSshConfig` calls (e.g. UI
- * autocomplete refreshes) skip the duplicate stat. Test deps mock
+ * Default dependencies using real implementations. `fileExists` is wrapped
+ * in {@link PathAccessCache} so consecutive `parseSshConfig` calls (e.g.
+ * UI autocomplete refreshes) skip the duplicate stat. Test deps mock
  * `fileExists` directly and bypass the cache entirely.
- */
-function rawFileExists(filePath: string): boolean {
-	try {
-		fs.accessSync(filePath, fs.constants.R_OK);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-/**
- * Default dependencies using real implementations.
  */
 function getDefaultDeps(): SshConfigParserDeps {
 	return {
@@ -90,7 +78,7 @@ function getDefaultDeps(): SshConfigParserDeps {
 			return fs.readFileSync(filePath, 'utf-8');
 		},
 		fileExists: (filePath: string): boolean => {
-			return getPathAccessCache().check(filePath, rawFileExists);
+			return getPathAccessCache().check(filePath, defaultReadableProbe);
 		},
 		homeDir: process.env.HOME || process.env.USERPROFILE || '',
 	};

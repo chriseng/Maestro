@@ -5,12 +5,11 @@
  * Used to execute AI agent commands on remote hosts via SSH.
  */
 
-import * as fs from 'fs';
 import { SshRemoteConfig, SshRemoteTestResult } from '../shared/types';
 import { execFileNoThrow, ExecResult } from './utils/execFile';
 import { expandTilde } from '../shared/pathUtils';
 import { captureException } from './utils/sentry';
-import { getPathAccessCache } from './utils/path-access-cache';
+import { getPathAccessCache, defaultReadableProbe } from './utils/path-access-cache';
 
 /**
  * Validation result for SSH remote configuration.
@@ -33,26 +32,14 @@ export interface SshRemoteManagerDeps {
 }
 
 /**
- * Synchronous read-perm probe. Wrapped behind {@link PathAccessCache} in
- * the production deps so rapid re-validation (e.g. consecutive Test
- * Connection clicks) skips the duplicate stat. Test deps mock
- * `checkFileAccess` directly and bypass the cache entirely.
- */
-function rawCheckFileAccess(filePath: string): boolean {
-	try {
-		fs.accessSync(filePath, fs.constants.R_OK);
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-/**
- * Default dependencies using real implementations.
+ * Default dependencies using real implementations. `checkFileAccess` is
+ * wrapped behind {@link PathAccessCache} so rapid re-validation (e.g.
+ * consecutive Test Connection clicks) skips the duplicate stat. Test
+ * deps mock `checkFileAccess` directly and bypass the cache entirely.
  */
 const defaultDeps: SshRemoteManagerDeps = {
 	checkFileAccess: (filePath: string): boolean => {
-		return getPathAccessCache().check(filePath, rawCheckFileAccess);
+		return getPathAccessCache().check(filePath, defaultReadableProbe);
 	},
 	execSsh: (command: string, args: string[]): Promise<ExecResult> => {
 		return execFileNoThrow(command, args);

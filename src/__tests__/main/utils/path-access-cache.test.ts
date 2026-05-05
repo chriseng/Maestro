@@ -5,11 +5,15 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import {
 	PathAccessCache,
 	DEFAULT_PATH_ACCESS_TTL_MS,
 	getPathAccessCache,
 	setPathAccessCacheForTest,
+	defaultReadableProbe,
 } from '../../../main/utils/path-access-cache';
 
 describe('PathAccessCache', () => {
@@ -142,5 +146,32 @@ describe('getPathAccessCache singleton', () => {
 		const custom = new PathAccessCache(1_000);
 		setPathAccessCacheForTest(custom);
 		expect(getPathAccessCache()).toBe(custom);
+	});
+});
+
+describe('defaultReadableProbe', () => {
+	let tempDir: string;
+
+	beforeEach(() => {
+		tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'maestro-probe-test-'));
+	});
+
+	afterEach(() => {
+		fs.rmSync(tempDir, { recursive: true, force: true });
+	});
+
+	it('returns true for a readable file', () => {
+		const filePath = path.join(tempDir, 'readable.txt');
+		fs.writeFileSync(filePath, 'hello');
+		expect(defaultReadableProbe(filePath)).toBe(true);
+	});
+
+	it('returns false for a missing path (ENOENT swallowed)', () => {
+		const filePath = path.join(tempDir, 'does-not-exist.txt');
+		expect(defaultReadableProbe(filePath)).toBe(false);
+	});
+
+	it('returns true for a readable directory (R_OK probe)', () => {
+		expect(defaultReadableProbe(tempDir)).toBe(true);
 	});
 });
