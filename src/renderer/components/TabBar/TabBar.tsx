@@ -72,6 +72,7 @@ function TabBarInner({
 	onCopyBrowserContent,
 	onSendBrowserContentToAgent,
 	colorBlindMode,
+	sshRemote,
 }: TabBarProps) {
 	// Dev-time warnings for missing handlers when unified tabs are provided
 	if (process.env.NODE_ENV !== 'production' && unifiedTabs) {
@@ -516,6 +517,7 @@ function TabBarInner({
 										tabIndex={originalIndex}
 										colorBlindMode={colorBlindMode}
 										shortcutHint={shortcutHint}
+										sshRemote={sshRemote}
 									/>
 								</React.Fragment>
 							);

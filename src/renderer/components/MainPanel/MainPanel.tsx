@@ -806,6 +806,8 @@ export const MainPanel = React.memo(
 									}
 									// Accessibility
 									colorBlindMode={colorBlindMode}
+									// Hide local-only OS actions (Reveal in Finder) when the agent runs over SSH
+									sshRemote={Boolean(filePreviewSshRemoteId)}
 								/>
 							)}
 
