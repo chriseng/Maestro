@@ -395,6 +395,7 @@ function TabBarInner({
 						onSearchMessages={onOpenOutputSearch ?? onOpenTabSearch}
 						tabSwitcherKeys={tabShortcuts.tabSwitcher?.keys ?? ['Alt', 'Meta', 't']}
 						searchOutputKeys={shortcuts.searchOutput?.keys ?? ['Meta', 'f']}
+						openTabCount={unifiedTabs?.length ?? tabs.length}
 					/>
 				)}
 				<button
