@@ -314,8 +314,24 @@ function CuePipelineEditorInner({
 	// On drag end, positions sync back to pipelineState.
 	const [displayNodes, setDisplayNodes] = useState<Node[]>(computedNodes);
 	useEffect(() => {
-		setDisplayNodes(computedNodes);
-	}, [computedNodes]);
+		setDisplayNodes((prev) => {
+			// While the user has unsaved edits, ReactFlow's live position on
+			// `displayNodes` is the authoritative one — `pipelineState` may briefly
+			// lag a drag (mid-drag onNodesChange updates displayNodes only; the
+			// commit happens in onNodeDragStop) and `computedNodes` is recomputed
+			// on every `activeRuns` poll. Blindly assigning `computedNodes` would
+			// snap a just-moved node back a couple seconds after drop. Preserve
+			// per-node positions for nodes that already exist on canvas; everything
+			// else (new nodes, deletions, data/badge updates) flows through.
+			if (!isDirty) return computedNodes;
+			const prevById = new Map(prev.map((n) => [n.id, n]));
+			return computedNodes.map((cn) => {
+				const existing = prevById.get(cn.id);
+				if (!existing) return cn;
+				return { ...cn, position: existing.position };
+			});
+		});
+	}, [computedNodes, isDirty]);
 
 	const nodes = displayNodes;
 

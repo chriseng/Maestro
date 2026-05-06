@@ -431,7 +431,7 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 			aria-label="Settings"
 		>
 			<div
-				className="w-[960px] h-[720px] rounded-xl border shadow-2xl overflow-hidden flex flex-col"
+				className="w-[960px] h-[720px] rounded-xl border shadow-2xl overflow-hidden flex flex-col select-none"
 				style={{ backgroundColor: theme.colors.bgSidebar, borderColor: theme.colors.border }}
 			>
 				{/* Search Bar + Close Button */}

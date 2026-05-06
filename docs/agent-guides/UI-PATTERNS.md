@@ -147,6 +147,28 @@ In development mode, `window.__MAESTRO_DEBUG__.layers` provides:
 - `simulate.escape()` - dispatch an Escape event
 - `simulate.closeAll()` - clear the entire stack
 
+### Text Selection in Modals
+
+**Rule:** any modal (or modal subtree) whose primary purpose is _clicking_ — buttons, tabs, list rows, cards, graph nodes, filter chips, toggles, dropdowns — must have `select-none` on its root container. The dashboard-style modals (Cue, Usage Dashboard, Symphony, Playbook Exchange, Settings, Director's Notes list) are all click-driven; native browser drag-to-select highlighting fires accidentally during normal interactions (clicking a tab, dragging a graph node, double-clicking a card) and looks broken.
+
+```tsx
+// Click-driven modal: kill text selection at the root
+<div className="relative rounded-xl shadow-2xl flex flex-col select-none">...</div>
+```
+
+`select-none` cascades through descendants but Chromium preserves native selection behavior inside `<input>` and `<textarea>`, so search fields and form controls keep working without intervention.
+
+**Carve out content subtrees with `select-text`** when the modal contains regions where copying matters: prose detail views, code/YAML editors, log entry bodies, error messages, file paths, AI chat output. Apply `select-text` directly on the root of that subtree — it overrides the ancestor's `select-none`.
+
+```tsx
+// Detail view nested inside a select-none parent: opt back in
+<div className="rounded-lg border shadow-2xl flex flex-col select-text">...</div>
+```
+
+**Skip modals whose primary purpose is reading or editing text:** `CueYamlEditor`, `CueHelpModal`, the wizard chat shell's message bubbles, Director's Notes detail popup, the System Log Viewer (intentionally left selectable), confirmation dialogs with error text. If the user's main interaction is reading or copying, leave selection alone.
+
+**When adding a new modal,** decide first whether it's click-driven or content-driven. If click-driven, add `select-none` to the root in the same commit as the modal itself — retrofitting it later requires hunting down every nested detail view to add `select-text` overrides.
+
 ---
 
 ## Theme System
