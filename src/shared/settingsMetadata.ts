@@ -615,6 +615,29 @@ export const SETTINGS_METADATA: Record<string, SettingMetadata> = {
 		category: 'advanced',
 	},
 
+	// --- Built-in AI Command Bundles ---
+	speckitEnabled: {
+		description:
+			'Show bundled Spec Kit slash commands in the AI command autocomplete. Disable to remove them from the slash command picker.',
+		type: 'boolean',
+		default: true,
+		category: 'integrations',
+	},
+	openspecEnabled: {
+		description:
+			'Show bundled OpenSpec slash commands in the AI command autocomplete. Disable to remove them from the slash command picker.',
+		type: 'boolean',
+		default: true,
+		category: 'integrations',
+	},
+	bmadEnabled: {
+		description:
+			'Show bundled BMAD slash commands in the AI command autocomplete. Disable to remove them from the slash command picker.',
+		type: 'boolean',
+		default: true,
+		category: 'integrations',
+	},
+
 	// --- Stats & Tracking ---
 	statsCollectionEnabled: {
 		description: 'Enable collection of usage statistics shown in the Usage Dashboard.',

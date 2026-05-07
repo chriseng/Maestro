@@ -381,6 +381,14 @@ export interface UseSettingsReturn {
 	autoRunInactivityTimeoutMin: number;
 	setAutoRunInactivityTimeoutMin: (value: number) => void;
 
+	// Built-in AI command bundle visibility
+	speckitEnabled: boolean;
+	setSpeckitEnabled: (value: boolean) => void;
+	openspecEnabled: boolean;
+	setOpenspecEnabled: (value: boolean) => void;
+	bmadEnabled: boolean;
+	setBmadEnabled: (value: boolean) => void;
+
 	// Hide ".files" (dotfiles) toggle in file explorer toolbar
 	dotfilesToggleHidden: boolean;
 	setDotfilesToggleHidden: (value: boolean) => void;

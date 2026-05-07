@@ -126,6 +126,12 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 		// AI Commands
 		customAICommands,
 		setCustomAICommands,
+		speckitEnabled,
+		setSpeckitEnabled,
+		openspecEnabled,
+		setOpenspecEnabled,
+		bmadEnabled,
+		setBmadEnabled,
 		// SSH Remote file indexing settings
 		sshRemoteIgnorePatterns,
 		setSshRemoteIgnorePatterns,
@@ -652,7 +658,11 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 
 								{/* Spec Kit Commands Section */}
 								<div data-setting-id="aicommands-speckit">
-									<SpecKitCommandsPanel theme={theme} />
+									<SpecKitCommandsPanel
+										theme={theme}
+										enabled={speckitEnabled}
+										onEnabledChange={setSpeckitEnabled}
+									/>
 								</div>
 
 								{/* Divider */}
@@ -660,7 +670,11 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 
 								{/* OpenSpec Commands Section */}
 								<div data-setting-id="aicommands-openspec">
-									<OpenSpecCommandsPanel theme={theme} />
+									<OpenSpecCommandsPanel
+										theme={theme}
+										enabled={openspecEnabled}
+										onEnabledChange={setOpenspecEnabled}
+									/>
 								</div>
 
 								{/* Divider */}
@@ -668,7 +682,11 @@ export const SettingsModal = memo(function SettingsModal(props: SettingsModalPro
 
 								{/* BMAD Commands Section */}
 								<div data-setting-id="aicommands-bmad">
-									<BmadCommandsPanel theme={theme} />
+									<BmadCommandsPanel
+										theme={theme}
+										enabled={bmadEnabled}
+										onEnabledChange={setBmadEnabled}
+									/>
 								</div>
 							</div>
 						)}

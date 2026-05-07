@@ -375,6 +375,9 @@ export interface SettingsStoreState {
 	autoRunDisabled: boolean;
 	dotfilesToggleHidden: boolean;
 	autoRunInactivityTimeoutMin: number;
+	speckitEnabled: boolean;
+	openspecEnabled: boolean;
+	bmadEnabled: boolean;
 	lastSelectedPromptId: string | null;
 	spellCheck: boolean;
 	annotatorPenColor: string;
@@ -485,6 +488,9 @@ export interface SettingsStoreActions {
 	setAutoRunDisabled: (value: boolean) => void;
 	setDotfilesToggleHidden: (value: boolean) => void;
 	setAutoRunInactivityTimeoutMin: (value: number) => void;
+	setSpeckitEnabled: (value: boolean) => void;
+	setOpenspecEnabled: (value: boolean) => void;
+	setBmadEnabled: (value: boolean) => void;
 	setLastSelectedPromptId: (value: string | null) => void;
 	setSpellCheck: (value: boolean) => void;
 	setAnnotatorPenColor: (value: string) => void;
@@ -675,6 +681,9 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		autoRunDisabled: false,
 		dotfilesToggleHidden: false,
 		autoRunInactivityTimeoutMin: 240,
+		speckitEnabled: true,
+		openspecEnabled: true,
+		bmadEnabled: true,
 		lastSelectedPromptId: null,
 		spellCheck: false,
 		annotatorPenColor: '#9146FF',
@@ -1264,6 +1273,21 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		setDotfilesToggleHidden: (value) => {
 			set({ dotfilesToggleHidden: value });
 			window.maestro.settings.set('dotfilesToggleHidden', value);
+		},
+
+		setSpeckitEnabled: (value) => {
+			set({ speckitEnabled: value });
+			window.maestro.settings.set('speckitEnabled', value);
+		},
+
+		setOpenspecEnabled: (value) => {
+			set({ openspecEnabled: value });
+			window.maestro.settings.set('openspecEnabled', value);
+		},
+
+		setBmadEnabled: (value) => {
+			set({ bmadEnabled: value });
+			window.maestro.settings.set('bmadEnabled', value);
 		},
 
 		setAutoRunInactivityTimeoutMin: (value) => {
@@ -2397,6 +2421,15 @@ export async function loadAllSettings(): Promise<void> {
 
 		if (allSettings['autoRunInactivityTimeoutMin'] !== undefined)
 			patch.autoRunInactivityTimeoutMin = allSettings['autoRunInactivityTimeoutMin'] as number;
+
+		if (allSettings['speckitEnabled'] !== undefined)
+			patch.speckitEnabled = allSettings['speckitEnabled'] as boolean;
+
+		if (allSettings['openspecEnabled'] !== undefined)
+			patch.openspecEnabled = allSettings['openspecEnabled'] as boolean;
+
+		if (allSettings['bmadEnabled'] !== undefined)
+			patch.bmadEnabled = allSettings['bmadEnabled'] as boolean;
 
 		if (allSettings['lastSelectedPromptId'] !== undefined)
 			patch.lastSelectedPromptId = allSettings['lastSelectedPromptId'] as string | null;
