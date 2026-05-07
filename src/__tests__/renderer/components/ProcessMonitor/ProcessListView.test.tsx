@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProcessListView } from '../../../../renderer/components/ProcessMonitor/ProcessListView';
 import type { ProcessNode } from '../../../../renderer/components/ProcessMonitor/types';
 import type { Theme } from '../../../../renderer/types';
@@ -68,6 +68,12 @@ const baseProps = {
 };
 
 describe('ProcessListView', () => {
+	afterEach(() => {
+		// Restores any vi.spyOn — notably the Element.prototype.scrollIntoView spy
+		// in the selection-changes test below — even if an assertion threw mid-test.
+		vi.restoreAllMocks();
+	});
+
 	it('renders the loading state', () => {
 		render(<ProcessListView {...baseProps} isLoading={true} tree={[]} />);
 		expect(screen.getByText('Loading processes...')).toBeInTheDocument();
@@ -131,7 +137,8 @@ describe('ProcessListView', () => {
 	});
 
 	it('scrollIntoView fires when the selected node id changes', () => {
-		// vi.spyOn auto-restores the original prototype method via vi.restoreAllMocks().
+		// afterEach -> vi.restoreAllMocks() guarantees prototype cleanup even if
+		// assertions throw, so no manual mockRestore() is needed here.
 		const scrollSpy = vi
 			.spyOn(Element.prototype, 'scrollIntoView')
 			.mockImplementation(() => undefined);
@@ -139,6 +146,5 @@ describe('ProcessListView', () => {
 		scrollSpy.mockClear();
 		rerender(<ProcessListView {...baseProps} selectedNodeId="session-session-1" />);
 		expect(scrollSpy).toHaveBeenCalledTimes(1);
-		scrollSpy.mockRestore();
 	});
 });

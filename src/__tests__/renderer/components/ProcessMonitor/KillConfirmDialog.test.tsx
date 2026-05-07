@@ -1,6 +1,20 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockRegisterLayer = vi.fn(() => 'kill-layer');
+const mockUnregisterLayer = vi.fn();
+const mockUpdateLayerHandler = vi.fn();
+
+vi.mock('../../../../renderer/contexts/LayerStackContext', () => ({
+	useLayerStack: () => ({
+		registerLayer: mockRegisterLayer,
+		unregisterLayer: mockUnregisterLayer,
+		updateLayerHandler: mockUpdateLayerHandler,
+	}),
+}));
+
 import { KillConfirmDialog } from '../../../../renderer/components/ProcessMonitor/KillConfirmDialog';
+import { MODAL_PRIORITIES } from '../../../../renderer/constants/modalPriorities';
 import type { Theme } from '../../../../renderer/types';
 
 const theme: Theme = {
@@ -24,6 +38,16 @@ const theme: Theme = {
 };
 
 describe('KillConfirmDialog', () => {
+	beforeEach(() => {
+		mockRegisterLayer.mockClear();
+		mockUnregisterLayer.mockClear();
+		mockUpdateLayerHandler.mockClear();
+	});
+
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
 	it('renders title and warning copy', () => {
 		render(
 			<KillConfirmDialog theme={theme} isKilling={false} onConfirm={() => {}} onCancel={() => {}} />
@@ -92,14 +116,37 @@ describe('KillConfirmDialog', () => {
 		expect(onConfirm).not.toHaveBeenCalled();
 	});
 
-	it('Escape triggers onCancel', () => {
+	it('registers a CONFIRM-priority layer so Escape wins over ProcessMonitor', () => {
+		render(
+			<KillConfirmDialog theme={theme} isKilling={false} onConfirm={() => {}} onCancel={() => {}} />
+		);
+		expect(mockRegisterLayer).toHaveBeenCalledWith(
+			expect.objectContaining({
+				type: 'modal',
+				priority: MODAL_PRIORITIES.CONFIRM,
+				ariaLabel: 'Kill Process',
+			})
+		);
+		expect(MODAL_PRIORITIES.CONFIRM).toBeGreaterThan(MODAL_PRIORITIES.PROCESS_MONITOR);
+	});
+
+	it('the registered onEscape handler invokes onCancel', () => {
 		const onCancel = vi.fn();
-		const { container } = render(
+		render(
 			<KillConfirmDialog theme={theme} isKilling={false} onConfirm={() => {}} onCancel={onCancel} />
 		);
-		const dialog = container.querySelector('[tabindex="-1"]') as HTMLElement;
-		fireEvent.keyDown(dialog, { key: 'Escape' });
+		const layer = mockRegisterLayer.mock.calls.at(-1)?.[0] as { onEscape?: () => void } | undefined;
+		expect(layer?.onEscape).toBeTypeOf('function');
+		layer?.onEscape?.();
 		expect(onCancel).toHaveBeenCalledTimes(1);
+	});
+
+	it('unregisters its layer on unmount', () => {
+		const { unmount } = render(
+			<KillConfirmDialog theme={theme} isKilling={false} onConfirm={() => {}} onCancel={() => {}} />
+		);
+		unmount();
+		expect(mockUnregisterLayer).toHaveBeenCalledWith('kill-layer');
 	});
 
 	it('shows the "Killing..." spinner state and disables both buttons', () => {

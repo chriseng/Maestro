@@ -2,9 +2,16 @@
 // ConfirmModal does not expose the "Killing…" spinner state we render on the confirm
 // button while the IPC dispatch is in flight. Migrating to ConfirmModal is a separate,
 // larger UX change and out of scope for the ProcessMonitor decomposition.
+//
+// Escape is owned by the layer stack (registers at MODAL_PRIORITIES.CONFIRM, which is
+// higher than PROCESS_MONITOR's 550) so the dialog's Escape always wins over the
+// underlying ProcessMonitor handler — per the CLAUDE.md convention "register with
+// layer stack — don't handle Escape locally".
 import { useEffect, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { Theme } from '../../types';
+import { useModalLayer } from '../../hooks/ui/useModalLayer';
+import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
 
 export interface KillConfirmDialogProps {
 	theme: Theme;
@@ -20,6 +27,8 @@ export function KillConfirmDialog({
 	onCancel,
 }: KillConfirmDialogProps) {
 	const dialogRef = useRef<HTMLDivElement>(null);
+
+	useModalLayer(MODAL_PRIORITIES.CONFIRM, 'Kill Process', onCancel);
 
 	useEffect(() => {
 		dialogRef.current?.focus();
@@ -41,9 +50,6 @@ export function KillConfirmDialog({
 					if (e.key === 'Enter' && !isKilling) {
 						e.preventDefault();
 						onConfirm();
-					} else if (e.key === 'Escape') {
-						e.preventDefault();
-						onCancel();
 					}
 				}}
 			>
