@@ -10,9 +10,12 @@ const killProcess = vi.fn(async () => undefined);
 const removeReason = vi.fn();
 
 beforeEach(() => {
-	endAutoRun.mockClear();
+	endAutoRun.mockReset();
+	endAutoRun.mockResolvedValue(undefined);
 	getActiveProcesses.mockReset();
+	getActiveProcesses.mockResolvedValue([]);
 	killProcess.mockReset();
+	killProcess.mockResolvedValue(undefined);
 	removeReason.mockReset();
 	(window as unknown as { maestro: unknown }).maestro = {
 		stats: { endAutoRun },
@@ -219,5 +222,71 @@ describe('useBatchKillAction', () => {
 		expect(onComplete).not.toHaveBeenCalled();
 		// Process kill + cleanup still runs.
 		expect(killProcess).toHaveBeenCalled();
+	});
+
+	it('sets the stop flag synchronously before any await fires', async () => {
+		// Make every IPC await hang so we can observe the flag before any of them resolves.
+		const neverResolve = new Promise(() => {});
+		endAutoRun.mockReturnValue(neverResolve as never);
+		getActiveProcesses.mockReturnValue(neverResolve as never);
+
+		const { hook, stopRequestedRefs } = setupHook();
+		// Fire-and-forget — don't await. The flag should already be set by the time
+		// killBatchRun yields to the first `await`.
+		void hook.result.current.killBatchRun('sess');
+
+		expect(stopRequestedRefs.current.sess).toBe(true);
+	});
+
+	it('continues with COMPLETE_BATCH + broadcast + stopTracking even if onComplete throws', async () => {
+		const onComplete = vi.fn(() => {
+			throw new Error('downstream callback boom');
+		});
+		const broadcastAutoRunState = vi.fn();
+		const flushDebouncedUpdate = vi.fn();
+		const dispatch = vi.fn();
+		const timeTracking = {
+			startTracking: vi.fn(),
+			stopTracking: vi.fn(),
+			getElapsedTime: vi.fn(() => 7777),
+		};
+		const autoRunFlushStateRefs = {
+			current: { sess: mkFlush() } as Record<string, AutoRunFlushState>,
+		};
+		const errorResolutionRefs = { current: {} as Record<string, ErrorResolutionEntry> };
+		const stopRequestedRefs = { current: {} as Record<string, boolean> };
+		const isMountedRef = { current: true };
+		const onAddHistoryEntry = vi.fn();
+
+		const { result } = renderHook(() =>
+			useBatchKillAction({
+				broadcastAutoRunState,
+				flushDebouncedUpdate,
+				dispatch,
+				timeTracking: timeTracking as never,
+				autoRunFlushStateRefs,
+				errorResolutionRefs,
+				stopRequestedRefs,
+				isMountedRef,
+				onAddHistoryEntry,
+				onComplete,
+			})
+		);
+
+		await act(async () => {
+			await result.current.killBatchRun('sess');
+		});
+
+		expect(onComplete).toHaveBeenCalled();
+		// Cleanup must still run despite the throw.
+		expect(killProcess).toHaveBeenCalled();
+		expect(flushDebouncedUpdate).toHaveBeenCalledWith('sess');
+		expect(dispatch).toHaveBeenCalledWith({
+			type: 'COMPLETE_BATCH',
+			sessionId: 'sess',
+			finalSessionIds: [],
+		});
+		expect(broadcastAutoRunState).toHaveBeenCalledWith('sess', null);
+		expect(timeTracking.stopTracking).toHaveBeenCalledWith('sess');
 	});
 });

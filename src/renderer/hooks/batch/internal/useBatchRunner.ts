@@ -231,6 +231,9 @@ export function useBatchRunner({
 						sessionId,
 						error: worktreeResult.error,
 					});
+					// Stop the tracker we initialised above so it doesn't leak into the
+					// next run's elapsed time.
+					timeTracking.stopTracking(sessionId);
 					return;
 				}
 				effectiveCwd = worktreeResult.effectiveCwd;
@@ -276,6 +279,9 @@ export function useBatchRunner({
 					'BatchProcessor',
 					{ sessionId }
 				);
+				// Stop the tracker we initialised above so it doesn't leak into the
+				// next run's elapsed time.
+				timeTracking.stopTracking(sessionId);
 				return;
 			}
 
@@ -304,7 +310,11 @@ export function useBatchRunner({
 					lastActiveTimestamp: batchStartTime,
 				},
 			});
-			// Broadcast state change
+			// Broadcast state change. Mirrors the START_BATCH payload above so mobile
+			// /web clients see the same pre-checked count the reducer just stored
+			// (avoids a brief "0/N" flicker before the next progress update arrives).
+			// `completedTasks` is intentionally 0 — the reducer also hardcodes the
+			// legacy field to 0 in START_BATCH.
 			broadcastAutoRunState(sessionId, {
 				isRunning: true,
 				isStopping: false,
@@ -314,7 +324,7 @@ export function useBatchRunner({
 				currentDocTasksTotal: 0,
 				currentDocTasksCompleted: 0,
 				totalTasksAcrossAllDocs: initialTotalTasks,
-				completedTasksAcrossAllDocs: 0,
+				completedTasksAcrossAllDocs: initialCheckedTasks,
 				loopEnabled,
 				loopIteration: 0,
 				maxLoops,

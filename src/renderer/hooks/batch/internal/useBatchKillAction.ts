@@ -68,6 +68,13 @@ export function useBatchKillAction({
 				'[BatchProcessor:killBatchRun] sessionId must not contain "-batch-"'
 			);
 
+			// Set the stop flag synchronously, before any await. The processing loop
+			// checks this flag at iteration boundaries; setting it early gives the loop
+			// the earliest possible chance to exit during the awaits below (stats,
+			// history, process enumeration). Intentionally NOT deleted later — see
+			// the comment on the trailing power.removeReason call.
+			stopRequestedRefs.current[sessionId] = true;
+
 			// 0. Flush Auto Run stats + history BEFORE we tear down timeTracking below.
 			//    stopTracking() deletes the tracker, so elapsed time must be captured now.
 			//    Atomically claiming the ref ensures the loop's normal cleanup won't double-write.
@@ -119,19 +126,29 @@ export function useBatchKillAction({
 				// the leaderboard. The natural-loop cleanup is unreliable for this: it calls
 				// timeTracking.stopTracking before reading getElapsedTime, so it would invoke
 				// onComplete with elapsedTimeMs:0, which the handler gates out.
+				// Wrapped in try/catch so a callback failure can't block process kill or
+				// the COMPLETE_BATCH/broadcast/stopTracking cleanup that follows.
 				if (isMountedRef.current && onComplete) {
-					onComplete({
-						sessionId,
-						sessionName: flushState.sessionName,
-						completedTasks,
-						totalTasks: flushState.getTotalTasks(),
-						wasStopped: true,
-						elapsedTimeMs: elapsedMs,
-						inputTokens: flushState.getInputTokens(),
-						outputTokens: flushState.getOutputTokens(),
-						totalCostUsd: flushState.getTotalCost(),
-						documentsProcessed: flushState.getDocumentsProcessed(),
-					});
+					try {
+						onComplete({
+							sessionId,
+							sessionName: flushState.sessionName,
+							completedTasks,
+							totalTasks: flushState.getTotalTasks(),
+							wasStopped: true,
+							elapsedTimeMs: elapsedMs,
+							inputTokens: flushState.getInputTokens(),
+							outputTokens: flushState.getOutputTokens(),
+							totalCostUsd: flushState.getTotalCost(),
+							documentsProcessed: flushState.getDocumentsProcessed(),
+						});
+					} catch (completeError) {
+						logger.error(
+							'[BatchProcessor:killBatchRun] onComplete callback threw:',
+							undefined,
+							completeError
+						);
+					}
 				}
 			}
 
@@ -158,8 +175,7 @@ export function useBatchKillAction({
 				logger.error('[BatchProcessor:killBatchRun] Failed to kill process:', undefined, error);
 			}
 
-			// 2. Set stop flag so the processing loop exits if it's still running
-			stopRequestedRefs.current[sessionId] = true;
+			// 2. (Stop flag was set synchronously at the top of this function, before any await.)
 
 			// 3. Resolve any pending error state
 			const errorResolution = errorResolutionRefs.current[sessionId];
