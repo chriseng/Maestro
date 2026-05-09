@@ -226,14 +226,15 @@ export function FeedbackChatView({ theme, onCancel, onWidthChange }: FeedbackCha
 	}, []);
 
 	// --- Publish draft state so the sidebar Feedback button + close handler
-	//     know whether the user has unsaved work that would be lost. Once the
+	//     know whether the user has unsaved work that would be lost. We only
+	//     count it as a draft once the user has actually sent a message —
+	//     unsubmitted typing or staged attachments don't count. Once the
 	//     issue is submitted (step === 'done') there's nothing left to lose.
 	useEffect(() => {
-		const hasContent =
-			messages.length > 0 || inputValue.trim().length > 0 || attachments.length > 0;
-		const hasDraft = hasContent && step !== 'done';
+		const hasSentMessage = messages.some((m) => m.role === 'user');
+		const hasDraft = hasSentMessage && step !== 'done';
 		useFeedbackDraftStore.getState().setHasDraft(hasDraft);
-	}, [messages, inputValue, attachments, step]);
+	}, [messages, step]);
 
 	// --- Background issue search — fires after every agent response ---
 	const runIssueSearch = useCallback(async (query: string) => {
