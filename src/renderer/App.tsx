@@ -859,7 +859,9 @@ function MaestroConsoleInner() {
 		[setRenameTabId, setRenameTabInitialName, setRenameTabModalOpen]
 	);
 
-	// Opens the startup-command modal for a terminal tab.
+	// Opens the startup-command modal for a terminal tab. Captures sessionId at
+	// open time so the save action targets the correct session even if the user
+	// switches agents while the modal is up.
 	const handleRequestTerminalTabConfigureStartupCommand = useCallback((tabId: string) => {
 		const session = selectActiveSession(useSessionStore.getState());
 		if (!session) return;
@@ -867,6 +869,7 @@ function MaestroConsoleInner() {
 		if (!tab) return;
 		const defaultCwd = session.cwd || session.projectRoot || '';
 		useModalStore.getState().openModal('terminalStartupCommand', {
+			sessionId: session.id,
 			tabId,
 			initialCommand: tab.startupCommand ?? '',
 			initialCwd: tab.startupCommandCwd ?? '',
