@@ -32,6 +32,10 @@ vi.mock('lucide-react', () => ({
 	ZoomIn: () => <span data-testid="zoom-in-icon">ZoomIn</span>,
 	ZoomOut: () => <span data-testid="zoom-out-icon">ZoomOut</span>,
 	Maximize2: () => <span data-testid="maximize-icon">Maximize2</span>,
+	// Icons added by PreviewTierChip in Phase 2.
+	Sparkles: () => <span data-testid="sparkles-icon">Sparkles</span>,
+	Zap: () => <span data-testid="zap-icon">Zap</span>,
+	Database: () => <span data-testid="database-icon">Database</span>,
 }));
 
 // Mock react-markdown

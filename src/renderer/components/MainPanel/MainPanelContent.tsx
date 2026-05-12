@@ -13,6 +13,7 @@ import { WizardConversationView, DocumentGenerationView } from '../InlineWizard'
 import { BrowserTabView } from './BrowserTabView';
 import { useUIStore } from '../../stores/uiStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { useTabStore } from '../../stores/tabStore';
 import type {
 	Session,
 	Theme,
@@ -491,6 +492,11 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 						// File change detection
 						lastModified={activeFileTab.lastModified}
 						onReloadFile={handleFilePreviewReload}
+						// Phase 2: per-tab preview tier override.
+						previewTierOverride={activeFileTab.previewTierOverride}
+						onPreviewTierChange={(tier) =>
+							useTabStore.getState().setFileTabPreviewTier(activeFileTabId, tier)
+						}
 					/>
 				</div>
 			) : (

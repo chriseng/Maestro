@@ -11,6 +11,23 @@ export interface MarkdownBlock {
 	id: number;
 	/** Unsanitized HTML for this block. Sanitization happens at render time. */
 	html: string;
+	/**
+	 * Slug of the heading that opens this block, when the block IS a heading.
+	 * Used by the TOC scroll-to mechanism to map a clicked TOC entry to a
+	 * block index for `virtuoso.scrollToIndex`. Undefined for non-heading
+	 * blocks (paragraphs, lists, code, etc.).
+	 */
+	headingSlug?: string;
+}
+
+/**
+ * Imperative handle exposed by the Fast tier preview so the parent's TOC
+ * can scroll to a heading by slug. The slug-to-block-index lookup is owned
+ * by the preview because it has the parsed block array; callers only need
+ * to know the slug.
+ */
+export interface MarkdownPreviewFastHandle {
+	scrollToHeading: (slug: string) => boolean;
 }
 
 /**

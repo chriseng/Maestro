@@ -8,4 +8,4 @@
  * surface.
  */
 export { MarkdownPreviewFast, default } from './MarkdownPreviewFast';
-export type { MarkdownPreviewFastProps } from './types';
+export type { MarkdownPreviewFastProps, MarkdownPreviewFastHandle } from './types';

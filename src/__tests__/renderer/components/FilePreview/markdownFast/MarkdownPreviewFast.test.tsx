@@ -20,6 +20,10 @@ import { mockTheme } from '../../../../helpers/mockTheme';
 // The real react-virtuoso requires a layout engine that jsdom doesn't fully
 // emulate; for behavior tests we only need to know that each block is
 // mounted and a click on the container can find an <a> via event.target.
+// Captures scrollToIndex calls so tests can assert the Fast tier's TOC
+// integration without depending on a real virtualizer layout.
+const scrollToIndexSpy = vi.fn();
+
 vi.mock('react-virtuoso', () => ({
 	Virtuoso: React.forwardRef(function MockVirtuoso(
 		props: {
@@ -27,8 +31,11 @@ vi.mock('react-virtuoso', () => ({
 			itemContent: (index: number, item: { id: number; html: string }) => React.ReactNode;
 			style?: React.CSSProperties;
 		},
-		_ref
+		ref: React.Ref<{ scrollToIndex: (arg: unknown) => void }>
 	) {
+		React.useImperativeHandle(ref, () => ({
+			scrollToIndex: scrollToIndexSpy,
+		}));
 		return (
 			<div data-testid="mock-virtuoso" style={props.style}>
 				{props.data.map((item, idx) => (
@@ -41,7 +48,10 @@ vi.mock('react-virtuoso', () => ({
 	}),
 }));
 
-import { MarkdownPreviewFast } from '../../../../../renderer/components/FilePreview/markdownFast';
+import {
+	MarkdownPreviewFast,
+	type MarkdownPreviewFastHandle,
+} from '../../../../../renderer/components/FilePreview/markdownFast';
 
 type FileClickHandler = (filePath: string, opts?: { openInNewTab?: boolean }) => void;
 type ExternalClickHandler = (href: string, opts?: { ctrlKey?: boolean }) => void;
@@ -67,6 +77,7 @@ function renderPreview(options: {
 describe('MarkdownPreviewFast', () => {
 	beforeEach(() => {
 		vi.useRealTimers();
+		scrollToIndexSpy.mockReset();
 	});
 
 	describe('parse + render lifecycle', () => {
@@ -255,6 +266,88 @@ describe('MarkdownPreviewFast', () => {
 
 		it('handles empty content without throwing', () => {
 			expect(() => renderPreview({ content: '' })).not.toThrow();
+		});
+
+		it('emits id attributes on rendered heading blocks', () => {
+			const { container } = renderPreview({ content: '# Hello World' });
+			expect(container.querySelector('#hello-world')).toBeTruthy();
+		});
+	});
+
+	describe('scrollToHeading imperative handle', () => {
+		it('scrolls Virtuoso to the matching heading block', () => {
+			const ref = { current: null } as React.MutableRefObject<MarkdownPreviewFastHandle | null>;
+			const containerRef = { current: null } as React.MutableRefObject<HTMLDivElement | null>;
+			const content = ['# Alpha', '', 'body', '', '# Beta', '', 'more body', '', '# Gamma'].join(
+				'\n'
+			);
+			render(
+				<MarkdownPreviewFast
+					ref={ref}
+					content={content}
+					theme={mockTheme}
+					markdownContainerRef={containerRef}
+				/>
+			);
+
+			const found = ref.current?.scrollToHeading('beta');
+			expect(found).toBe(true);
+			expect(scrollToIndexSpy).toHaveBeenCalledOnce();
+			// Blocks: [alpha, body, beta, more body, gamma] → 'beta' is at index 2.
+			const call = scrollToIndexSpy.mock.calls[0][0];
+			expect(call.index).toBe(2);
+			expect(call.align).toBe('start');
+		});
+
+		it('returns false when no heading matches the given slug', () => {
+			const ref = { current: null } as React.MutableRefObject<MarkdownPreviewFastHandle | null>;
+			const containerRef = { current: null } as React.MutableRefObject<HTMLDivElement | null>;
+			const content = ['# Alpha', '', '# Beta'].join('\n');
+			render(
+				<MarkdownPreviewFast
+					ref={ref}
+					content={content}
+					theme={mockTheme}
+					markdownContainerRef={containerRef}
+				/>
+			);
+
+			const found = ref.current?.scrollToHeading('nonexistent');
+			expect(found).toBe(false);
+			expect(scrollToIndexSpy).not.toHaveBeenCalled();
+		});
+
+		it('disambiguates duplicate heading slugs (same, same-1, same-2)', () => {
+			const ref = { current: null } as React.MutableRefObject<MarkdownPreviewFastHandle | null>;
+			const containerRef = { current: null } as React.MutableRefObject<HTMLDivElement | null>;
+			const content = ['# Same', '', '# Same', '', '# Same'].join('\n');
+			render(
+				<MarkdownPreviewFast
+					ref={ref}
+					content={content}
+					theme={mockTheme}
+					markdownContainerRef={containerRef}
+				/>
+			);
+
+			ref.current?.scrollToHeading('same-1');
+			expect(scrollToIndexSpy).toHaveBeenCalledOnce();
+			// Blocks: [same, same-1, same-2] → 'same-1' is at index 1.
+			expect(scrollToIndexSpy.mock.calls[0][0].index).toBe(1);
+		});
+
+		it('returns false on a document with no headings', () => {
+			const ref = { current: null } as React.MutableRefObject<MarkdownPreviewFastHandle | null>;
+			const containerRef = { current: null } as React.MutableRefObject<HTMLDivElement | null>;
+			render(
+				<MarkdownPreviewFast
+					ref={ref}
+					content="just a paragraph"
+					theme={mockTheme}
+					markdownContainerRef={containerRef}
+				/>
+			);
+			expect(ref.current?.scrollToHeading('whatever')).toBe(false);
 		});
 	});
 });

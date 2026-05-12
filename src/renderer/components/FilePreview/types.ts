@@ -72,6 +72,16 @@ export interface FilePreviewProps {
 	lastModified?: number;
 	/** Callback to reload file content from disk (called when user clicks Reload in the change banner) */
 	onReloadFile?: () => void;
+	/**
+	 * Per-tab preview tier override. When set, the FilePreview forces this
+	 * tier regardless of file size. When undefined, the auto-picker decides.
+	 */
+	previewTierOverride?: 'rich' | 'fast' | 'giant';
+	/**
+	 * Callback fired when the user picks a tier in the override chip.
+	 * Passing `undefined` returns the file to auto-tier mode.
+	 */
+	onPreviewTierChange?: (tier: 'rich' | 'fast' | 'giant' | undefined) => void;
 }
 
 export interface FilePreviewHandle {

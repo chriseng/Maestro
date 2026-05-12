@@ -58,7 +58,10 @@ export function tokensToBlocks(md: ParserInstance, tokens: ParserToken[]): Markd
 
 		const slice = tokens.slice(i, Math.min(j + 1, tokens.length));
 		const html = md.renderer.render(slice, md.options, {});
-		blocks.push({ id: nextId++, html });
+		// If this block IS a heading, remember its slug so the TOC can later
+		// map a clicked heading to this block's index via scrollToIndex.
+		const headingSlug = openType === 'heading_open' ? (tok.attrGet('id') ?? undefined) : undefined;
+		blocks.push({ id: nextId++, html, headingSlug });
 		i = j + 1;
 	}
 

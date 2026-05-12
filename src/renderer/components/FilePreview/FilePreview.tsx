@@ -67,6 +67,7 @@ import { FilePreviewHeader } from './FilePreviewHeader';
 import { ImageViewer } from './ImageViewer';
 import { FilePreviewToc } from './FilePreviewToc';
 import { HighlightedCodeEditor } from './HighlightedCodeEditor';
+import { PreviewTierChip } from './PreviewTierChip';
 import { logger } from '../../utils/logger';
 
 // Lazy-loaded large-file markdown renderer. Keeping it out of the main bundle
@@ -111,6 +112,8 @@ export const FilePreview = React.memo(
 			isTabMode,
 			lastModified,
 			onReloadFile,
+			previewTierOverride,
+			onPreviewTierChange,
 		},
 		ref
 	) {
@@ -149,6 +152,9 @@ export const FilePreview = React.memo(
 		const scrollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 		const tocButtonRef = useRef<HTMLButtonElement>(null);
 		const tocOverlayRef = useRef<HTMLDivElement>(null);
+		// Imperative handle for the lazy-loaded Fast tier preview. Used by the
+		// TOC to scroll to a heading via virtuoso.scrollToIndex when in Fast tier.
+		const markdownFastRef = useRef<import('./markdownFast').MarkdownPreviewFastHandle>(null);
 
 		// Reset full content view when file changes
 		useEffect(() => {
@@ -238,14 +244,18 @@ export const FilePreview = React.memo(
 		// Choose preview tier for markdown files. react-markdown handles small
 		// files; large files route to MarkdownPreviewFast (markdown-it + virtuoso).
 		// Tier is memoized on path so switching tabs and coming back doesn't
-		// re-decide. Phase 2 will add a manual override chip; for now the choice
-		// is automatic.
-		const previewTier = useMemo(() => {
+		// re-decide.
+		const autoTier = useMemo(() => {
 			if (!file?.content || !isMarkdown) return 'rich' as const;
 			const bytes = file.content.length;
 			const lines = countLines(file.content);
 			return pickPreviewTier(bytes, lines);
 		}, [file?.path, file?.content, isMarkdown]);
+
+		// Effective tier respects the user's per-tab override, falling back to
+		// the auto-picked tier. The PreviewTierChip in the header lets the user
+		// flip between modes; selection is persisted via onPreviewTierChange.
+		const previewTier = previewTierOverride ?? autoTier;
 
 		// For very large files, truncate content for syntax highlighting to prevent freezes
 		const displayContent = useMemo(() => {
@@ -1035,6 +1045,24 @@ export const FilePreview = React.memo(
 					headerIconClass={headerIconClass}
 				/>
 
+				{/* Tier override chip — only meaningful for markdown previews */}
+				{isMarkdown && !markdownEditMode && file && (
+					<div
+						className="flex items-center justify-end gap-2 px-6 py-1.5 border-b shrink-0"
+						style={{
+							backgroundColor: theme.colors.bgSidebar,
+							borderColor: theme.colors.border,
+						}}
+					>
+						<PreviewTierChip
+							theme={theme}
+							autoTier={autoTier}
+							override={previewTierOverride}
+							onSelect={(tier) => onPreviewTierChange?.(tier)}
+						/>
+					</div>
+				)}
+
 				{/* File changed on disk banner */}
 				{fileChangedOnDisk && (
 					<div
@@ -1449,6 +1477,7 @@ export const FilePreview = React.memo(
 							}
 						>
 							<MarkdownPreviewFast
+								ref={markdownFastRef}
 								content={file.content}
 								theme={theme}
 								markdownContainerRef={markdownContainerRef}
@@ -1611,6 +1640,11 @@ export const FilePreview = React.memo(
 						tocOverlayRef={tocOverlayRef}
 						isMarkdown={isMarkdown}
 						markdownEditMode={markdownEditMode}
+						onSelectHeading={
+							previewTier === 'fast'
+								? (slug) => markdownFastRef.current?.scrollToHeading(slug) ?? false
+								: undefined
+						}
 					/>
 				</div>
 

@@ -1,6 +1,7 @@
 import { splitFrontmatter } from './frontmatter';
 import { createParser } from './parser';
 import { tokensToBlocks } from './blocks';
+import { applyHeadingSlugs } from './headingSlugger';
 import type { MarkdownBlock } from './types';
 
 /**
@@ -21,6 +22,7 @@ export function buildBlocks(source: string): MarkdownBlock[] {
 
 	const md = createParser();
 	const tokens = md.parse(body, {});
+	applyHeadingSlugs(md, tokens);
 	const bodyBlocks = tokensToBlocks(md, tokens);
 
 	const all: MarkdownBlock[] = [];
@@ -29,7 +31,7 @@ export function buildBlocks(source: string): MarkdownBlock[] {
 		all.push({ id: id++, html: frontmatterHtml });
 	}
 	for (const block of bodyBlocks) {
-		all.push({ id: id++, html: block.html });
+		all.push({ ...block, id: id++ });
 	}
 	return all;
 }

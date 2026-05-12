@@ -1,10 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { createParser } from '../../../../../renderer/components/FilePreview/markdownFast/parser';
 import { tokensToBlocks } from '../../../../../renderer/components/FilePreview/markdownFast/blocks';
+import { applyHeadingSlugs } from '../../../../../renderer/components/FilePreview/markdownFast/headingSlugger';
 
 function parseToBlocks(source: string) {
 	const md = createParser();
 	const tokens = md.parse(source, {});
+	return tokensToBlocks(md, tokens);
+}
+
+function parseToBlocksWithSlugs(source: string) {
+	const md = createParser();
+	const tokens = md.parse(source, {});
+	applyHeadingSlugs(md, tokens);
 	return tokensToBlocks(md, tokens);
 }
 
@@ -119,5 +127,35 @@ describe('tokensToBlocks', () => {
 		const blocks = parseToBlocks(source);
 		const ids = new Set(blocks.map((b) => b.id));
 		expect(ids.size).toBe(blocks.length);
+	});
+
+	describe('headingSlug propagation', () => {
+		it('does not attach a headingSlug when no slugger plugin runs', () => {
+			const blocks = parseToBlocks('# A\n\nparagraph');
+			expect(blocks[0].headingSlug).toBeUndefined();
+			expect(blocks[1].headingSlug).toBeUndefined();
+		});
+
+		it('attaches headingSlug to heading blocks when slugger plugin runs', () => {
+			const blocks = parseToBlocksWithSlugs('# Hello World');
+			expect(blocks[0].headingSlug).toBe('hello-world');
+		});
+
+		it('leaves non-heading blocks with undefined headingSlug', () => {
+			const blocks = parseToBlocksWithSlugs('# H\n\nparagraph\n\n- list');
+			expect(blocks[0].headingSlug).toBe('h');
+			expect(blocks[1].headingSlug).toBeUndefined();
+			expect(blocks[2].headingSlug).toBeUndefined();
+		});
+
+		it('preserves slug uniqueness across duplicate headings', () => {
+			const blocks = parseToBlocksWithSlugs('# Same\n\n# Same\n\n# Same');
+			expect(blocks.map((b) => b.headingSlug)).toEqual(['same', 'same-1', 'same-2']);
+		});
+
+		it('handles a doc with no headings at all', () => {
+			const blocks = parseToBlocksWithSlugs('just a paragraph\n\nand another');
+			expect(blocks.every((b) => b.headingSlug === undefined)).toBe(true);
+		});
 	});
 });
