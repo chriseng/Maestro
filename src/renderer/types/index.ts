@@ -497,6 +497,11 @@ export interface FilePreviewTab {
 	// Navigation history for breadcrumb navigation (per-tab)
 	navigationHistory?: FilePreviewHistoryEntry[]; // Stack of visited files
 	navigationIndex?: number; // Current position in history (-1 or undefined = at end)
+	// Preview tier override (per-tab). When set, forces the FilePreview to use
+	// this tier regardless of file size. Cleared on tab close. Used by the
+	// PreviewTierChip in the header so users can escalate (Rich → Fast for
+	// performance) or de-escalate (Fast → Rich for full features) at will.
+	previewTierOverride?: 'rich' | 'fast' | 'giant';
 }
 
 /**

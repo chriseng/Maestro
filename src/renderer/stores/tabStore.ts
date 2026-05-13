@@ -265,6 +265,13 @@ export interface TabStoreActions {
 	 * Toggle edit mode on a file preview tab.
 	 */
 	toggleFileTabEditMode: (tabId: string) => void;
+
+	/**
+	 * Set or clear the preview tier override on a file preview tab.
+	 * Pass `undefined` to clear and fall back to the auto-tier from
+	 * `pickPreviewTier`. Pass a concrete tier to force it.
+	 */
+	setFileTabPreviewTier: (tabId: string, tier: 'rich' | 'fast' | 'giant' | undefined) => void;
 }
 
 export type TabStore = TabStoreState & TabStoreActions;
@@ -584,4 +591,6 @@ export const useTabStore = create<TabStore>()((set) => ({
 		if (!tab) return;
 		updateFileTab(tabId, { editMode: !tab.editMode });
 	},
+
+	setFileTabPreviewTier: (tabId, tier) => updateFileTab(tabId, { previewTierOverride: tier }),
 }));

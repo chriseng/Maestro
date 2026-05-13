@@ -32,6 +32,10 @@ vi.mock('lucide-react', () => ({
 	ZoomIn: () => <span data-testid="zoom-in-icon">ZoomIn</span>,
 	ZoomOut: () => <span data-testid="zoom-out-icon">ZoomOut</span>,
 	Maximize2: () => <span data-testid="maximize-icon">Maximize2</span>,
+	// Icons added by PreviewTierChip in Phase 2.
+	Sparkles: () => <span data-testid="sparkles-icon">Sparkles</span>,
+	Zap: () => <span data-testid="zap-icon">Zap</span>,
+	Database: () => <span data-testid="database-icon">Database</span>,
 }));
 
 // Mock react-markdown
@@ -367,7 +371,10 @@ describe('FilePreview', () => {
 		});
 
 		it('shows the truncation banner for large readable text previews and can load the full file', () => {
-			const largeContent = 'Readable paragraph with plenty of words for truncation. '.repeat(4000);
+			// Multi-line content sized to trigger the legacy 100KB truncation banner
+			// (Rich tier) without crossing the long-line threshold that would
+			// escalate to Giant tier.
+			const largeContent = 'Readable paragraph with plenty of words for truncation.\n'.repeat(4000);
 
 			render(
 				<FilePreview
@@ -772,7 +779,9 @@ describe('FilePreview', () => {
 	describe('large file handling', () => {
 		it('shows truncation banner for files larger than 100KB', () => {
 			// Create content larger than LARGE_FILE_PREVIEW_LIMIT (100KB)
-			const largeContent = 'x'.repeat(150 * 1024); // 150KB
+			// Multi-line content to trigger the legacy Rich-tier truncation
+			// banner without escalating to Giant via the long-line signal.
+			const largeContent = ('x'.repeat(99) + '\n').repeat(1536); // ~150KB / ~1.5k lines
 			render(
 				<FilePreview
 					{...defaultProps}
@@ -811,7 +820,8 @@ describe('FilePreview', () => {
 		});
 
 		it('truncates displayed content to 100KB for syntax highlighting', () => {
-			const largeContent = 'y'.repeat(200 * 1024); // 200KB
+			// Multi-line, no single line above the 10k long-line threshold.
+			const largeContent = ('y'.repeat(99) + '\n').repeat(2048); // ~200KB / ~2k lines
 			render(
 				<FilePreview
 					{...defaultProps}
@@ -826,7 +836,8 @@ describe('FilePreview', () => {
 		});
 
 		it('loads full file content when "Load full file" button is clicked', () => {
-			const largeContent = 'y'.repeat(200 * 1024); // 200KB
+			// Multi-line, no single line above the 10k long-line threshold.
+			const largeContent = ('y'.repeat(99) + '\n').repeat(2048); // ~200KB / ~2k lines
 			render(
 				<FilePreview
 					{...defaultProps}
