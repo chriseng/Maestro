@@ -5,7 +5,7 @@
  * idempotency, disconnect.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
 	createTextCodeHighlighter,
 	HIGHLIGHTED_ATTR,
@@ -61,6 +61,10 @@ vi.mock('shiki', () => ({
 	})),
 }));
 
+// Track every root appended via makeRoot so afterEach can detach them and keep
+// document.body clean between tests (prevents DOM leakage across the suite).
+const createdRoots: HTMLDivElement[] = [];
+
 beforeEach(() => {
 	(
 		globalThis as typeof globalThis & { IntersectionObserver: typeof IntersectionObserver }
@@ -68,10 +72,17 @@ beforeEach(() => {
 	FakeIntersectionObserver.instances.length = 0;
 });
 
+afterEach(() => {
+	while (createdRoots.length > 0) {
+		createdRoots.pop()?.remove();
+	}
+});
+
 function makeRoot(html: string): HTMLDivElement {
 	const root = document.createElement('div');
 	root.innerHTML = html;
 	document.body.appendChild(root);
+	createdRoots.push(root);
 	return root;
 }
 
@@ -132,6 +143,10 @@ describe('createTextCodeHighlighter', () => {
 		handle.observe(root);
 		const observer = FakeIntersectionObserver.instances[0];
 		observer.trigger([root.querySelector('code')!]);
+		// Yield one microtask tick so any pending continuation can run. We use
+		// setTimeout(0) here instead of vi.waitFor because this is a negative
+		// assertion (innerHTML must stay '+++'); a polling waitFor would succeed
+		// immediately without proving the highlight path didn't fire.
 		await new Promise((r) => setTimeout(r, 0));
 		// detectLanguage returns null → highlight bails before touching innerHTML.
 		expect(root.querySelector('code')!.innerHTML).toBe('+++');
@@ -161,11 +176,22 @@ describe('createTextCodeHighlighter', () => {
 	});
 
 	it('no-ops gracefully when IntersectionObserver is unavailable', () => {
+		// Preserve the global so we restore it even on failure — otherwise the
+		// deleted constructor leaks into whatever test runs next in this worker.
+		const originalIO = (
+			globalThis as typeof globalThis & { IntersectionObserver: typeof IntersectionObserver }
+		).IntersectionObserver;
 		// @ts-expect-error — simulate older environment.
 		delete globalThis.IntersectionObserver;
-		const root = makeRoot('<pre><code class="language-ts">x</code></pre>');
-		const handle = createTextCodeHighlighter({ theme: mockTheme });
-		expect(() => handle.observe(root)).not.toThrow();
-		expect(() => handle.disconnect()).not.toThrow();
+		try {
+			const root = makeRoot('<pre><code class="language-ts">x</code></pre>');
+			const handle = createTextCodeHighlighter({ theme: mockTheme });
+			expect(() => handle.observe(root)).not.toThrow();
+			expect(() => handle.disconnect()).not.toThrow();
+		} finally {
+			(
+				globalThis as typeof globalThis & { IntersectionObserver: typeof IntersectionObserver }
+			).IntersectionObserver = originalIO;
+		}
 	});
 });
