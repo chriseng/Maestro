@@ -1,8 +1,9 @@
-import { app, BrowserWindow, Menu, powerMonitor } from 'electron';
+import { app, BrowserWindow, Menu, powerMonitor, protocol } from 'electron';
 import { isMacOS } from '../shared/platformDetection';
 import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
+import { readFile } from 'fs/promises';
 // Sentry is imported dynamically below to avoid module-load-time access to electron.app
 // which causes "Cannot read properties of undefined (reading 'getAppPath')" errors
 import { ProcessManager } from './process-manager';
@@ -156,6 +157,28 @@ import type { TemplateContext } from '../shared/templateVariables';
 // ============================================================================
 // Store type definitions are imported from ./stores/types.ts
 const isDevelopment = process.env.NODE_ENV === 'development';
+
+// Electron 41 / Chromium 138 forbid ES module imports from `file://` URLs (the
+// production entry chunk loads but its `import { ... } from "./..."` statements
+// fail with "Failed to fetch dynamically imported module" and the React app
+// never mounts). Serve the production renderer through a custom `app://`
+// scheme so static and dynamic ES module imports succeed under a normal
+// http(s)-style origin.
+const RENDERER_SCHEME = 'app';
+if (!isDevelopment) {
+	protocol.registerSchemesAsPrivileged([
+		{
+			scheme: RENDERER_SCHEME,
+			privileges: {
+				standard: true,
+				secure: true,
+				supportFetchAPI: true,
+				corsEnabled: true,
+				stream: true,
+			},
+		},
+	]);
+}
 
 // Capture the production data path before any modification
 // Used for stores that should be shared between dev and prod (e.g., agent configs)
@@ -339,6 +362,7 @@ const windowManager = createWindowManager({
 	isDevelopment,
 	preloadPath: path.join(__dirname, 'preload.js'),
 	rendererPath: path.join(__dirname, '../renderer/index.html'),
+	rendererProductionUrl: `${RENDERER_SCHEME}://app/index.html`,
 	devServerUrl: devServerUrl,
 	useNativeTitleBar,
 	autoHideMenuBar,
@@ -404,6 +428,57 @@ if (!gotSingleInstanceLock) {
 app
 	.whenReady()
 	.then(async () => {
+		// Serve the production renderer over `app://` so static and dynamic ES
+		// module imports succeed on Electron 41 (Chromium 138 blocks both under
+		// file://). `net.fetch` cannot read file:// URLs in Electron 41 either, so
+		// we read assets directly via fs and return a Response.
+		if (!isDevelopment) {
+			const rendererRoot = path.resolve(__dirname, '../renderer');
+			const mimeByExt: Record<string, string> = {
+				'.html': 'text/html; charset=utf-8',
+				'.js': 'text/javascript; charset=utf-8',
+				'.mjs': 'text/javascript; charset=utf-8',
+				'.css': 'text/css; charset=utf-8',
+				'.json': 'application/json; charset=utf-8',
+				'.svg': 'image/svg+xml',
+				'.png': 'image/png',
+				'.jpg': 'image/jpeg',
+				'.jpeg': 'image/jpeg',
+				'.gif': 'image/gif',
+				'.ico': 'image/x-icon',
+				'.webp': 'image/webp',
+				'.woff': 'font/woff',
+				'.woff2': 'font/woff2',
+				'.ttf': 'font/ttf',
+				'.otf': 'font/otf',
+				'.map': 'application/json; charset=utf-8',
+			};
+			protocol.handle(RENDERER_SCHEME, async (request) => {
+				const url = new URL(request.url);
+				const requestedPath = decodeURIComponent(url.pathname);
+				const relative =
+					requestedPath === '/' || requestedPath === '' ? '/index.html' : requestedPath;
+				const resolved = path.normalize(path.join(rendererRoot, relative));
+				if (!resolved.startsWith(rendererRoot)) {
+					return new Response('forbidden', { status: 403 });
+				}
+				try {
+					const data = await readFile(resolved);
+					const ext = path.extname(resolved).toLowerCase();
+					const contentType = mimeByExt[ext] ?? 'application/octet-stream';
+					return new Response(new Uint8Array(data), {
+						status: 200,
+						headers: { 'content-type': contentType },
+					});
+				} catch (err) {
+					logger.warn(`Renderer asset not found: ${resolved}`, 'Window', {
+						err: String(err),
+					});
+					return new Response('not found', { status: 404 });
+				}
+			});
+		}
+
 		// Load logger settings first
 		const logLevel = store.get('logLevel', 'info');
 		logger.setLogLevel(logLevel);

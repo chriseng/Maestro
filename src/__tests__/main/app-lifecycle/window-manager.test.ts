@@ -162,6 +162,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -183,6 +184,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -203,6 +205,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -228,6 +231,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -264,6 +268,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -291,6 +296,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -322,6 +328,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -347,6 +354,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -369,6 +377,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -380,7 +389,7 @@ describe('app-lifecycle/window-manager', () => {
 			expect(mockWindowInstance.maximize).not.toHaveBeenCalled();
 		});
 
-		it('should load production file in production mode', async () => {
+		it('should load production renderer via the app:// protocol in production mode', async () => {
 			const { createWindowManager } = await import('../../../main/app-lifecycle/window-manager');
 
 			const windowManager = createWindowManager({
@@ -390,6 +399,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -397,8 +407,8 @@ describe('app-lifecycle/window-manager', () => {
 
 			windowManager.createWindow();
 
-			expect(mockWindowInstance.loadFile).toHaveBeenCalledWith('/path/to/index.html');
-			expect(mockWindowInstance.loadURL).not.toHaveBeenCalled();
+			expect(mockWindowInstance.loadURL).toHaveBeenCalledWith('app://app/index.html');
+			expect(mockWindowInstance.loadFile).not.toHaveBeenCalled();
 		});
 
 		it('should load dev server URL in development mode', async () => {
@@ -411,6 +421,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: true,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -432,6 +443,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -454,6 +466,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -488,6 +501,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -512,6 +526,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: true,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -534,6 +549,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -565,6 +581,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -589,6 +606,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -618,6 +636,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -643,6 +662,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -664,6 +684,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -684,7 +705,7 @@ describe('app-lifecycle/window-manager', () => {
 			expect(mockEvent.preventDefault).toHaveBeenCalled();
 		});
 
-		it('should allow file:// navigation to the renderer entry HTML in production', async () => {
+		it('should allow navigation to the renderer entry URL in production', async () => {
 			const { createWindowManager } = await import('../../../main/app-lifecycle/window-manager');
 
 			const windowManager = createWindowManager({
@@ -694,6 +715,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -706,13 +728,13 @@ describe('app-lifecycle/window-manager', () => {
 			);
 			const navigateHandler = willNavigateCall![1];
 
-			// Should allow file:// navigation to the renderer entry HTML itself.
+			// Should allow navigation to the renderer entry URL itself.
 			const mockEvent = { preventDefault: vi.fn() };
-			navigateHandler(mockEvent, 'file:///path/to/index.html');
+			navigateHandler(mockEvent, 'app://app/index.html');
 			expect(mockEvent.preventDefault).not.toHaveBeenCalled();
 		});
 
-		it('should block file:// navigation outside renderer directory in production', async () => {
+		it('should block navigation outside the renderer origin in production', async () => {
 			const { createWindowManager } = await import('../../../main/app-lifecycle/window-manager');
 
 			const windowManager = createWindowManager({
@@ -722,6 +744,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -734,7 +757,8 @@ describe('app-lifecycle/window-manager', () => {
 			);
 			const navigateHandler = willNavigateCall![1];
 
-			// Should block file:// navigation to paths outside the renderer directory
+			// Anything not on the app:// renderer origin must be blocked — file://
+			// is now off-limits too because the renderer is served via app:// only.
 			const mockEvent = { preventDefault: vi.fn() };
 			navigateHandler(mockEvent, 'file:///etc/passwd');
 			expect(mockEvent.preventDefault).toHaveBeenCalled();
@@ -754,6 +778,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -783,6 +808,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -817,6 +843,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -844,6 +871,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: true,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -874,6 +902,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: true,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -904,6 +933,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -921,11 +951,11 @@ describe('app-lifecycle/window-manager', () => {
 			const navigateHandler = willNavigateCalls[0][1];
 			for (let i = 0; i < 5; i++) {
 				const allowed = { preventDefault: vi.fn() };
-				navigateHandler(allowed, 'file:///path/to/index.html');
+				navigateHandler(allowed, 'app://app/index.html');
 				expect(allowed.preventDefault).not.toHaveBeenCalled();
 
 				const blocked = { preventDefault: vi.fn() };
-				navigateHandler(blocked, 'file:///path/to/other.md');
+				navigateHandler(blocked, 'app://app/other.md');
 				expect(blocked.preventDefault).toHaveBeenCalled();
 			}
 		});
@@ -940,6 +970,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: true,
 				autoHideMenuBar: false,
@@ -960,6 +991,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: true,
@@ -980,6 +1012,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -1021,6 +1054,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -1053,6 +1087,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -1096,6 +1131,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -1128,6 +1164,7 @@ describe('app-lifecycle/window-manager', () => {
 				isDevelopment: false,
 				preloadPath: '/path/to/preload.js',
 				rendererPath: '/path/to/index.html',
+				rendererProductionUrl: 'app://app/index.html',
 				devServerUrl: 'http://localhost:5173',
 				useNativeTitleBar: false,
 				autoHideMenuBar: false,
@@ -1148,6 +1185,53 @@ describe('app-lifecycle/window-manager', () => {
 					type: 'webview',
 				})
 			);
+		});
+
+		// Electron 41 removed the legacy `'crashed'` event in favor of
+		// `'render-process-gone'`. These tests pin the wiring so a future
+		// revert can't silently drop renderer-crash reporting.
+		describe('webContents crash event wiring', () => {
+			it('registers a render-process-gone listener', async () => {
+				const { createWindowManager } = await import('../../../main/app-lifecycle/window-manager');
+
+				const windowManager = createWindowManager({
+					windowStateStore: mockWindowStateStore as unknown as Parameters<
+						typeof createWindowManager
+					>[0]['windowStateStore'],
+					isDevelopment: false,
+					preloadPath: '/path/to/preload.js',
+					rendererPath: '/path/to/index.html',
+					rendererProductionUrl: 'app://app/index.html',
+					devServerUrl: 'http://localhost:5173',
+					useNativeTitleBar: false,
+					autoHideMenuBar: false,
+				});
+
+				windowManager.createWindow();
+
+				expect(webContentsEventHandlers.has('render-process-gone')).toBe(true);
+			});
+
+			it('does not register the deprecated crashed listener', async () => {
+				const { createWindowManager } = await import('../../../main/app-lifecycle/window-manager');
+
+				const windowManager = createWindowManager({
+					windowStateStore: mockWindowStateStore as unknown as Parameters<
+						typeof createWindowManager
+					>[0]['windowStateStore'],
+					isDevelopment: false,
+					preloadPath: '/path/to/preload.js',
+					rendererPath: '/path/to/index.html',
+					rendererProductionUrl: 'app://app/index.html',
+					devServerUrl: 'http://localhost:5173',
+					useNativeTitleBar: false,
+					autoHideMenuBar: false,
+				});
+
+				windowManager.createWindow();
+
+				expect(webContentsEventHandlers.has('crashed')).toBe(false);
+			});
 		});
 	});
 });
