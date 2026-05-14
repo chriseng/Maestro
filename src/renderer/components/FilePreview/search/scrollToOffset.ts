@@ -1,44 +1,43 @@
 /**
- * Pure DOM helper: build a `Range` at a character offset inside a rendered
- * Fast-tier block.
+ * Pure DOM helpers shared by every FilePreview tier that needs to land the
+ * viewport on a matched word (not just the matched block / page).
  *
- * Why this lives in its own module:
- *   The Fast tier's `scrollToMatch` needs to land the viewport on the matched
- *   word, not just the matched block. Once Virtuoso mounts the block we know
- *   the block element + the within-block character offset of the match (from
- *   `SearchHit.offsetWithinBlock`). Walking the block's text nodes to convert
- *   that offset into a DOM `Range` is a pure DOM operation — extracted here
- *   so the component test file can stub Virtuoso and exercise this logic
- *   independently.
+ * Why shared:
+ *   The markdown Fast tier (Virtuoso blocks), text Fast tier (TanStack Virtual
+ *   pages), and any future tier all need the same primitive — given a mounted
+ *   container element + a character offset + a length, build a DOM `Range`
+ *   over exactly those characters and scroll it into view. The only per-tier
+ *   difference is which selector locates the container; each tier handles
+ *   that locally.
  *
- * No React, no Virtuoso, no Fast-tier internals — just standard DOM APIs.
+ * No React, no virtualizer internals — just standard DOM APIs.
  */
 
 /**
- * Walk text nodes inside `blockEl` to build a `Range` that spans `length`
- * characters starting at `offsetWithinBlock`. Handles matches that cross
- * inline element boundaries (rare but valid — e.g. a search query that spans
- * a `<strong>` boundary).
+ * Walk text nodes inside `containerEl` to build a `Range` that spans
+ * `length` characters starting at `offsetWithinContainer`. Handles matches
+ * that cross inline element boundaries (rare but valid — e.g. a search
+ * query that spans a `<strong>` boundary or a Shiki-emitted `<span>`).
  *
- * Returns `null` when the offset is past the end of the block's text content,
- * which happens when the search engine and the DOM diverge (e.g. a sanitizer
- * stripped some content). Callers should treat null as "no precise target,
- * fall back to block-level scroll".
+ * Returns `null` when the offset is past the end of the container's text
+ * content, which can happen when the search engine and the DOM diverge
+ * (e.g. a sanitizer stripped some content). Callers should treat null as
+ * "no precise target, fall back to container-level scroll".
  */
 export function buildRangeAtOffset(
-	blockEl: HTMLElement,
-	offsetWithinBlock: number,
+	containerEl: HTMLElement,
+	offsetWithinContainer: number,
 	length: number
 ): Range | null {
-	if (offsetWithinBlock < 0 || length < 0) return null;
-	const walker = document.createTreeWalker(blockEl, NodeFilter.SHOW_TEXT);
+	if (offsetWithinContainer < 0 || length < 0) return null;
+	const walker = document.createTreeWalker(containerEl, NodeFilter.SHOW_TEXT);
 	let consumed = 0;
 	let node: Node | null;
 	while ((node = walker.nextNode())) {
 		const textNode = node as Text;
 		const nodeLen = (textNode.textContent ?? '').length;
-		if (consumed + nodeLen > offsetWithinBlock) {
-			const startOffsetInNode = offsetWithinBlock - consumed;
+		if (consumed + nodeLen > offsetWithinContainer) {
+			const startOffsetInNode = offsetWithinContainer - consumed;
 			const range = document.createRange();
 			range.setStart(textNode, startOffsetInNode);
 

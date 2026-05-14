@@ -14,7 +14,7 @@ import { resolveLinkAction } from './linkRouter';
 import { createCodeHighlighter } from './codeHighlighter';
 import { createMermaidRenderer } from './mermaidRenderer';
 import { findHits } from './searchHits';
-import { buildRangeAtOffset, scrollRangeIntoView } from './scrollToOffsetInBlock';
+import { buildRangeAtOffset, scrollRangeIntoView } from '../search/scrollToOffset';
 import { FAST_BLOCK_CLASS, generateProseCss } from './proseStyles';
 import type { MarkdownBlock, MarkdownPreviewFastHandle, MarkdownPreviewFastProps } from './types';
 

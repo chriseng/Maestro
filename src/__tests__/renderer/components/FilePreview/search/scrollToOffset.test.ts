@@ -1,5 +1,6 @@
 /**
- * Tests for the pure DOM helpers used by Fast tier markdown precision scroll.
+ * Tests for the pure DOM helpers shared by Fast-tier markdown and text
+ * precision scroll.
  *
  * Coverage: simple flat text, nested inline elements, multi-byte chars,
  * boundary offsets, and the multi-node Range case.
@@ -9,7 +10,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
 	buildRangeAtOffset,
 	scrollRangeIntoView,
-} from '../../../../../renderer/components/FilePreview/markdownFast/scrollToOffsetInBlock';
+} from '../../../../../renderer/components/FilePreview/search/scrollToOffset';
 
 function mkBlock(html: string): HTMLDivElement {
 	const div = document.createElement('div');
