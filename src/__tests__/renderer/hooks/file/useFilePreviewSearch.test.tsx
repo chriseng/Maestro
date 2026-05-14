@@ -297,4 +297,90 @@ describe('useFilePreviewSearch — count vs navigate split', () => {
 		expect(handle.getTotalMatches()).toBe(0);
 		expect(handle.getCurrentMatchIndex()).toBe(-1);
 	});
+
+	it('registers both search-results AND search-current Highlights on initial count + navigate', async () => {
+		const hits: SearchHit[] = [
+			{ sourceOffset: 0, length: 5, blockIndex: 0, offsetWithinBlock: 0 },
+			{ sourceOffset: 12, length: 5, blockIndex: 0, offsetWithinBlock: 12 },
+		];
+		const adapter = makeAdapter(hits);
+		const { handle } = renderHost({ adapter });
+
+		await act(async () => {
+			handle.setSearchQuery('hello');
+		});
+		// Wait one rAF for the navigate effect's post-scroll DOM walk to apply
+		// the current-match Highlight (adapter-driven tier path).
+		await act(async () => {
+			await new Promise((r) => requestAnimationFrame(() => r(undefined)));
+		});
+
+		expect(fakeHighlightStore.has('search-results')).toBe(true);
+		expect(fakeHighlightStore.has('search-current')).toBe(true);
+	});
+});
+
+describe('useFilePreviewSearch — gutter exclusion (B5)', () => {
+	it('skips text inside .text-fast-gutter and .cm-gutters elements', async () => {
+		// Rich-tier path (no adapter): count comes from the DOM walker. A
+		// container with a gutter line-number "42" and a body "42" must count
+		// only the body one — the search bar should never highlight gutter
+		// chrome.
+		function GutterHost(props: { expose: (h: HostHandle) => void }) {
+			const containerRef = React.useRef<HTMLDivElement>(null);
+			const codeRef = React.useRef<HTMLDivElement>(null);
+			const contentRef = React.useRef<HTMLDivElement>(null);
+			const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+			const hook = useFilePreviewSearch({
+				codeContainerRef: codeRef,
+				markdownContainerRef: containerRef,
+				contentRef,
+				textareaRef,
+				isMarkdown: false,
+				isReadableText: true,
+				isImage: false,
+				isCsv: false,
+				isJsonl: false,
+				isJson: false,
+				isEditableText: false,
+				markdownEditMode: false,
+				editContent: '',
+				fileContent: '42 in body\nline 42',
+				accentColor: '#ff0000',
+				searchMode: 'text',
+			});
+			props.expose({
+				setSearchQuery: hook.setSearchQuery,
+				goToNextMatch: hook.goToNextMatch,
+				goToPrevMatch: hook.goToPrevMatch,
+				getTotalMatches: () => hook.totalMatches,
+				getCurrentMatchIndex: () => hook.currentMatchIndex,
+			});
+			return (
+				<div ref={contentRef}>
+					<div ref={containerRef}>
+						<div className="text-fast-gutter">42</div>
+						<div>body text 42 here</div>
+					</div>
+				</div>
+			);
+		}
+
+		const ref: { current: HostHandle | undefined } = { current: undefined };
+		render(<GutterHost expose={(h) => (ref.current = h)} />);
+		const handle: HostHandle = {
+			setSearchQuery: (q) => ref.current!.setSearchQuery(q),
+			goToNextMatch: () => ref.current!.goToNextMatch(),
+			goToPrevMatch: () => ref.current!.goToPrevMatch(),
+			getTotalMatches: () => ref.current!.getTotalMatches(),
+			getCurrentMatchIndex: () => ref.current!.getCurrentMatchIndex(),
+		};
+
+		await act(async () => {
+			handle.setSearchQuery('42');
+		});
+
+		// Gutter "42" is excluded → only the body "42" counts.
+		expect(handle.getTotalMatches()).toBe(1);
+	});
 });

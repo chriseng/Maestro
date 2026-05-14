@@ -19,10 +19,33 @@ export type { SearchHit, FilePreviewSearchAdapter };
 // use stable names (`search-results` / `search-current`) so prose CSS can style
 // them per-tier (see `markdownFast/proseStyles.ts`, `textFast/proseStyles.ts`).
 
+/**
+ * Class names whose subtree the search walker MUST skip — these are
+ * preview-chrome containers (line-number gutters, etc.) that aren't user
+ * content. Highlighting "42" against a line-number "42" would be a false
+ * positive both visually and (in the Rich tier fallback) numerically.
+ */
+const SEARCH_EXCLUDED_CLASSES = ['text-fast-gutter', 'cm-gutters'];
+
+function isInsideExcludedContainer(node: Node): boolean {
+	let el = node.parentElement;
+	while (el) {
+		for (const cls of SEARCH_EXCLUDED_CLASSES) {
+			if (el.classList.contains(cls)) return true;
+		}
+		el = el.parentElement;
+	}
+	return false;
+}
+
 function walkContainerForRanges(container: HTMLElement, escapedQuery: string): Range[] {
 	if (!escapedQuery) return [];
 	const ranges: Range[] = [];
-	const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+	const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+		acceptNode(node) {
+			return isInsideExcludedContainer(node) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+		},
+	});
 	let textNode: Node | null;
 	while ((textNode = walker.nextNode())) {
 		const text = (textNode as Text).textContent || '';
@@ -411,7 +434,9 @@ export function useFilePreviewSearch({
 		const ranges = rangesRef.current;
 		const targetRange = ranges[Math.min(currentMatchIndex, ranges.length - 1)] ?? null;
 		applyCurrentHighlight(targetRange);
-		if (targetRange) {
+		// jsdom's Range lacks getBoundingClientRect — guard the scroll path so
+		// tests don't crash. Real browsers always have it.
+		if (targetRange && typeof targetRange.getBoundingClientRect === 'function') {
 			const rect = targetRange.getBoundingClientRect();
 			const scrollParent = contentRef.current;
 			if (scrollParent && rect) {

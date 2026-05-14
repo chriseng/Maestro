@@ -78,10 +78,17 @@ export const GiantPreview = forwardRef<GiantPreviewHandle, GiantPreviewProps>(fu
 		};
 	}, [content, language, baseExtensions]);
 
-	// Bridge the host element to the parent containerRef so the existing
-	// search hook can scope to it for adapter-driven search effects.
+	// Bridge CM6's content element (not the host) to the parent containerRef.
+	// useFilePreviewSearch walks this container for DOM ranges to register CSS
+	// Highlights; scoping to `.cm-content` excludes the gutter (line numbers)
+	// so a search like "123" doesn't paint highlights on gutter digits and
+	// also keeps the all-matches count accurate when CM6's own match-count
+	// has to agree with the DOM-walker fallback.
 	useEffect(() => {
-		if (containerRef) containerRef.current = hostRef.current;
+		if (!containerRef) return;
+		const host = hostRef.current;
+		const contentEl = host?.querySelector<HTMLElement>('.cm-content') ?? host;
+		containerRef.current = contentEl;
 	});
 
 	useImperativeHandle(
