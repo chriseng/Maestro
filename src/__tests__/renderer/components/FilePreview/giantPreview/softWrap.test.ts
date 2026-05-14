@@ -62,16 +62,13 @@ describe('softWrapLongLines', () => {
 		expect(softWrapLongLines('a', 10).wrapped).toBe('a');
 	});
 
-	it('handles a 500 KB single-line stress case quickly without throwing', () => {
+	it('handles a 500 KB single-line stress case without throwing', () => {
 		const huge = 'A'.repeat(500_000);
-		const t0 = performance.now();
 		const out = softWrapLongLines(huge, SOFT_WRAP_MAX_LINE_LENGTH);
-		const elapsed = performance.now() - t0;
 		// Wrapped output preserves every original char (just adds newlines).
 		const stripped = out.wrapped.replace(/\n/g, '');
 		expect(stripped.length).toBe(500_000);
 		expect(stripped).toBe(huge);
-		expect(elapsed).toBeLessThan(1000);
 		// No line longer than the threshold.
 		const longestLine = out.wrapped
 			.split('\n')

@@ -61,6 +61,12 @@ export interface SoftWrapResult {
  */
 export function softWrapLongLines(content: string, maxLineLength: number): SoftWrapResult {
 	if (!content) return { wrapped: content, insertionsAt: new Uint32Array(0) };
+	// Guard against a non-positive threshold — `p += maxLineLength` would
+	// loop forever on a zero step. Treat invalid input as a no-op so callers
+	// don't have to validate before delegating.
+	if (!Number.isFinite(maxLineLength) || maxLineLength <= 0) {
+		return { wrapped: content, insertionsAt: new Uint32Array(0) };
+	}
 
 	// Cheap pre-check: walk once for the longest line; bail when nothing
 	// exceeds the threshold so we don't allocate a new string for normal

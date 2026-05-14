@@ -6,17 +6,23 @@ Small, committed assets used by automated tests live alongside this file
 ## Large preview fixtures (not committed)
 
 The 26 synthetic files used to manually verify the tiered FilePreview
-pipeline (Rich / Fast / Giant) are too big to commit. They live at:
+pipeline (Rich / Fast / Giant) are too big to commit. Place (or generate)
+them outside the repo at a location convenient for you — the suggested
+sibling layout is:
 
 ```
-/Users/saifccript/WorkRepository/razarauf/maestro/AgentTesting/demo-vue-calculator/preview-test-files/
+<your-workspace>/AgentTesting/demo-vue-calculator/preview-test-files/
 ```
 
-That directory ships with `_generate.mjs`, a Node script that regenerates
-every fixture (deterministic output, no network). To rebuild:
+The author of this README keeps them at the path above as a peer of the
+Maestro checkout, but any directory works. That directory ships with
+`_generate.mjs`, a Node script that regenerates every fixture
+(deterministic output, no network). If you don't yet have the directory,
+copy `_generate.mjs` from another developer's setup or recreate it from
+the fixture descriptions below; then run:
 
 ```bash
-cd /Users/saifccript/WorkRepository/razarauf/maestro/AgentTesting/demo-vue-calculator/preview-test-files
+cd <your-workspace>/AgentTesting/demo-vue-calculator/preview-test-files
 node _generate.mjs
 ```
 

@@ -348,20 +348,12 @@ export function useFilePreviewSearch({
 		const container = markdownContainerRef.current;
 		const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-		if (!hasHighlightApi()) {
-			// Old-browser fallback: source-string count only, no live highlights.
-			// Scroll to the first match by walking DOM in the navigate effect.
-			const matches = fileContent?.match(new RegExp(escapedQuery, 'gi'));
-			const count = matches ? matches.length : 0;
-			hitsRef.current = null;
-			rangesRef.current = [];
-			setTotalMatches(count);
-			setCurrentMatchIndex(count > 0 ? 0 : -1);
-			return;
-		}
-
 		// Adapter is the authoritative source for Fast/Giant tiers. Called
 		// exactly once per query change (the whole point of splitting effects).
+		// Runs regardless of CSS Highlight API support so the count + navigate
+		// path stays correct even on the rare browser that lacks the API; the
+		// applyAllHighlight/applyCurrentHighlight helpers below are no-ops in
+		// that case.
 		const adapterHits = searchAdapter ? searchAdapter.findHits(searchQuery) : null;
 		const ranges = walkContainerForRanges(container, escapedQuery);
 		hitsRef.current = adapterHits;

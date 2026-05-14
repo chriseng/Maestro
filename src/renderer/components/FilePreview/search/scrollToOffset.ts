@@ -48,8 +48,12 @@ export function buildRangeAtOffset(
 			}
 
 			// Multi-node range: keep walking until we've consumed `length` more
-			// characters from where the start node ended.
+			// characters from where the start node ended. Track the last text
+			// node we visit so the fallback clamp lands on the end of the
+			// LAST traversed node (not the start node).
 			let remaining = length - (nodeLen - startOffsetInNode);
+			let lastTextNode: Text = textNode;
+			let lastNodeLen: number = nodeLen;
 			while ((node = walker.nextNode())) {
 				const nextNode = node as Text;
 				const nextLen = (nextNode.textContent ?? '').length;
@@ -58,12 +62,14 @@ export function buildRangeAtOffset(
 					return range;
 				}
 				remaining -= nextLen;
+				lastTextNode = nextNode;
+				lastNodeLen = nextLen;
 			}
 
 			// Ran out of text before satisfying `length` — clamp end to the
 			// last node end. Caller still gets a usable range starting at the
 			// right position for scroll purposes.
-			range.setEnd(textNode, nodeLen);
+			range.setEnd(lastTextNode, lastNodeLen);
 			return range;
 		}
 		consumed += nodeLen;

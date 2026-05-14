@@ -116,7 +116,7 @@ describe('scrollRangeIntoView', () => {
 		expect(spy).toHaveBeenCalledWith({ block: 'nearest', behavior: 'auto' });
 	});
 
-	it('returns true when range start has no parent (defensive)', () => {
+	it('returns false when range start has no parent (defensive)', () => {
 		// Detached node: parentElement is null. Should not throw, returns false.
 		const detached = document.createTextNode('orphan');
 		const range = document.createRange();
