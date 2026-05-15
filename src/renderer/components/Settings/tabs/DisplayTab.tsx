@@ -21,6 +21,7 @@ import {
 	WrapText,
 	ListFilter,
 	PanelTop,
+	PanelLeft,
 	Palette,
 	Sparkles,
 } from 'lucide-react';
@@ -84,6 +85,8 @@ export function DisplayTab({ theme }: DisplayTabProps) {
 		setShowWorktreePill,
 		showWorktreeBranchName,
 		setShowWorktreeBranchName,
+		showLeftPanelGroupMemberCount,
+		setShowLeftPanelGroupMemberCount,
 		documentGraphShowExternalLinks,
 		setDocumentGraphShowExternalLinks,
 		documentGraphMaxNodes,
@@ -449,6 +452,50 @@ export function DisplayTab({ theme }: DisplayTabProps) {
 							<span
 								className={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
 									showSessionCostPill ? 'translate-x-5' : 'translate-x-0.5'
+								}`}
+							/>
+						</button>
+					</div>
+				</div>
+			</div>
+
+			{/* Left Side Panel */}
+			<div data-setting-id="display-left-side-panel">
+				<SettingsSectionHeading icon={PanelLeft}>Left Side Panel</SettingsSectionHeading>
+				<div
+					className="p-3 rounded border space-y-3"
+					style={{
+						borderColor: theme.colors.border,
+						backgroundColor: theme.colors.bgMain,
+					}}
+				>
+					{/* Show group member count */}
+					<div className="flex items-center justify-between">
+						<div>
+							<p className="text-sm" style={{ color: theme.colors.textMain }}>
+								Show group member count
+							</p>
+							<p className="text-xs opacity-50 mt-0.5">
+								Display the number of agents in parentheses after each group name in the left side
+								bar (e.g. &quot;UNGROUPED AGENTS (24)&quot;).
+							</p>
+						</div>
+						<button
+							onClick={() => setShowLeftPanelGroupMemberCount(!showLeftPanelGroupMemberCount)}
+							className="relative w-10 h-5 rounded-full transition-colors flex-shrink-0 outline-none"
+							tabIndex={0}
+							style={{
+								backgroundColor: showLeftPanelGroupMemberCount
+									? theme.colors.accent
+									: theme.colors.bgActivity,
+							}}
+							role="switch"
+							aria-checked={showLeftPanelGroupMemberCount}
+							aria-label="Show group member count in left side bar"
+						>
+							<span
+								className={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+									showLeftPanelGroupMemberCount ? 'translate-x-5' : 'translate-x-0.5'
 								}`}
 							/>
 						</button>

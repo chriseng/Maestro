@@ -41,7 +41,7 @@ import { getModalActions, useModalStore } from '../../stores/modalStore';
 import { SessionContextMenu } from './SessionContextMenu';
 import { WizardIndicator } from './WizardIndicator';
 import { HamburgerMenuContent } from './HamburgerMenuContent';
-import { CollapsedSessionPill } from './CollapsedSessionPill';
+import { CollapsedSessionPillRows } from './CollapsedSessionPill';
 import { SidebarActions } from './SidebarActions';
 import { SkinnySidebar } from './SkinnySidebar';
 import { LiveOverlayPanel } from './LiveOverlayPanel';
@@ -147,6 +147,7 @@ function SessionListInner(props: SessionListProps) {
 	const webInterfaceUseCustomPort = useSettingsStore((s) => s.webInterfaceUseCustomPort);
 	const webInterfaceCustomPort = useSettingsStore((s) => s.webInterfaceCustomPort);
 	const ungroupedCollapsed = useSettingsStore((s) => s.ungroupedCollapsed);
+	const showLeftPanelGroupMemberCount = useSettingsStore((s) => s.showLeftPanelGroupMemberCount);
 	const autoRunStats = useSettingsStore((s) => s.autoRunStats);
 	const contextWarningYellowThreshold = useSettingsStore(
 		(s) => s.contextManagementSettings.contextWarningYellowThreshold
@@ -1012,7 +1013,14 @@ function SessionListInner(props: SessionListProps) {
 										<ChevronDown className="w-3 h-3" />
 									)}
 									<Bookmark className="w-3.5 h-3.5" fill={theme.colors.accent} />
-									<span>Bookmarks</span>
+									<span>
+										Bookmarks
+										{showLeftPanelGroupMemberCount && sortedBookmarkedParentSessions.length > 0 && (
+											<span className="ml-1 opacity-60">
+												({sortedBookmarkedParentSessions.length})
+											</span>
+										)}
+									</span>
 									<WizardIndicator
 										active={wizardRollup.bookmarkActive}
 										generatingDocs={wizardRollup.bookmarkGenerating}
@@ -1035,26 +1043,19 @@ function SessionListInner(props: SessionListProps) {
 								</div>
 							) : (
 								/* Collapsed Bookmarks Palette - uses subdivided pills for worktrees */
-								<div
-									className="ml-8 mr-3 mt-1 mb-2 flex gap-1 h-1.5 cursor-pointer"
-									onClick={() => setBookmarksCollapsed(false)}
-								>
-									{sortedBookmarkedParentSessions.map((s) => (
-										<CollapsedSessionPill
-											key={`bookmark-collapsed-${s.id}`}
-											session={s}
-											keyPrefix="bookmark-collapsed"
-											theme={theme}
-											activeBatchSessionIds={activeBatchSessionIds}
-											leftSidebarWidth={leftSidebarWidthState}
-											contextWarningYellowThreshold={contextWarningYellowThreshold}
-											contextWarningRedThreshold={contextWarningRedThreshold}
-											getFileCount={getFileCount}
-											getWorktreeChildren={getWorktreeChildren}
-											setActiveSessionId={setActiveSessionId}
-										/>
-									))}
-								</div>
+								<CollapsedSessionPillRows
+									sessions={sortedBookmarkedParentSessions}
+									keyPrefix="bookmark-collapsed"
+									onContainerClick={() => setBookmarksCollapsed(false)}
+									theme={theme}
+									activeBatchSessionIds={activeBatchSessionIds}
+									leftSidebarWidth={leftSidebarWidthState}
+									contextWarningYellowThreshold={contextWarningYellowThreshold}
+									contextWarningRedThreshold={contextWarningRedThreshold}
+									getFileCount={getFileCount}
+									getWorktreeChildren={getWorktreeChildren}
+									setActiveSessionId={setActiveSessionId}
+								/>
 							)}
 						</div>
 					)}
@@ -1114,7 +1115,12 @@ function SessionListInner(props: SessionListProps) {
 												}}
 											/>
 										) : (
-											<span onDoubleClick={() => startRenamingGroup(group.id)}>{group.name}</span>
+											<span onDoubleClick={() => startRenamingGroup(group.id)}>
+												{group.name}
+												{showLeftPanelGroupMemberCount && groupCollapsedPills.length > 0 && (
+													<span className="ml-1 opacity-60">({groupCollapsedPills.length})</span>
+												)}
+											</span>
 										)}
 										<WizardIndicator
 											active={wizardRollup.groups.has(group.id)}
@@ -1171,26 +1177,19 @@ function SessionListInner(props: SessionListProps) {
 									</div>
 								) : groupCollapsedPills.length > 0 ? (
 									/* Collapsed Group Palette - uses subdivided pills for worktrees */
-									<div
-										className="ml-8 mr-3 mt-1 mb-2 flex gap-1 h-1.5 cursor-pointer"
-										onClick={() => toggleGroup(group.id)}
-									>
-										{groupCollapsedPills.map((s) => (
-											<CollapsedSessionPill
-												key={`group-collapsed-${group.id}-${s.id}`}
-												session={s}
-												keyPrefix={`group-collapsed-${group.id}`}
-												theme={theme}
-												activeBatchSessionIds={activeBatchSessionIds}
-												leftSidebarWidth={leftSidebarWidthState}
-												contextWarningYellowThreshold={contextWarningYellowThreshold}
-												contextWarningRedThreshold={contextWarningRedThreshold}
-												getFileCount={getFileCount}
-												getWorktreeChildren={getWorktreeChildren}
-												setActiveSessionId={setActiveSessionId}
-											/>
-										))}
-									</div>
+									<CollapsedSessionPillRows
+										sessions={groupCollapsedPills}
+										keyPrefix={`group-collapsed-${group.id}`}
+										onContainerClick={() => toggleGroup(group.id)}
+										theme={theme}
+										activeBatchSessionIds={activeBatchSessionIds}
+										leftSidebarWidth={leftSidebarWidthState}
+										contextWarningYellowThreshold={contextWarningYellowThreshold}
+										contextWarningRedThreshold={contextWarningRedThreshold}
+										getFileCount={getFileCount}
+										getWorktreeChildren={getWorktreeChildren}
+										setActiveSessionId={setActiveSessionId}
+									/>
 								) : null}
 							</div>
 						);
@@ -1242,7 +1241,14 @@ function SessionListInner(props: SessionListProps) {
 										<ChevronDown className="w-3 h-3" />
 									)}
 									<Folder className="w-3.5 h-3.5" />
-									<span>Ungrouped Agents</span>
+									<span>
+										Ungrouped Agents
+										{showLeftPanelGroupMemberCount && sortedUngroupedParentSessions.length > 0 && (
+											<span className="ml-1 opacity-60">
+												({sortedUngroupedParentSessions.length})
+											</span>
+										)}
+									</span>
 									<WizardIndicator
 										active={wizardRollup.groups.has(null)}
 										generatingDocs={!!wizardRollup.groups.get(null)?.isGeneratingDocs}
@@ -1279,26 +1285,19 @@ function SessionListInner(props: SessionListProps) {
 								</div>
 							) : (
 								/* Collapsed Ungrouped Palette - uses subdivided pills for worktrees */
-								<div
-									className="ml-8 mr-3 mt-1 mb-2 flex gap-1 h-1.5 cursor-pointer"
-									onClick={() => setUngroupedCollapsed(false)}
-								>
-									{sortedUngroupedParentSessions.map((s) => (
-										<CollapsedSessionPill
-											key={`ungrouped-collapsed-${s.id}`}
-											session={s}
-											keyPrefix="ungrouped-collapsed"
-											theme={theme}
-											activeBatchSessionIds={activeBatchSessionIds}
-											leftSidebarWidth={leftSidebarWidthState}
-											contextWarningYellowThreshold={contextWarningYellowThreshold}
-											contextWarningRedThreshold={contextWarningRedThreshold}
-											getFileCount={getFileCount}
-											getWorktreeChildren={getWorktreeChildren}
-											setActiveSessionId={setActiveSessionId}
-										/>
-									))}
-								</div>
+								<CollapsedSessionPillRows
+									sessions={sortedUngroupedParentSessions}
+									keyPrefix="ungrouped-collapsed"
+									onContainerClick={() => setUngroupedCollapsed(false)}
+									theme={theme}
+									activeBatchSessionIds={activeBatchSessionIds}
+									leftSidebarWidth={leftSidebarWidthState}
+									contextWarningYellowThreshold={contextWarningYellowThreshold}
+									contextWarningRedThreshold={contextWarningRedThreshold}
+									getFileCount={getFileCount}
+									getWorktreeChildren={getWorktreeChildren}
+									setActiveSessionId={setActiveSessionId}
+								/>
 							)}
 						</div>
 					) : groups.length > 0 && !showUnreadAgentsOnly ? (

@@ -373,6 +373,7 @@ export interface SettingsStoreState {
 	showSessionCostPill: boolean;
 	showWorktreePill: boolean;
 	showWorktreeBranchName: boolean;
+	showLeftPanelGroupMemberCount: boolean;
 	moderatorStandingInstructions: string;
 	autoRunDisabled: boolean;
 	dotfilesToggleHidden: boolean;
@@ -488,6 +489,7 @@ export interface SettingsStoreActions {
 	setShowSessionCostPill: (value: boolean) => void;
 	setShowWorktreePill: (value: boolean) => void;
 	setShowWorktreeBranchName: (value: boolean) => void;
+	setShowLeftPanelGroupMemberCount: (value: boolean) => void;
 	setModeratorStandingInstructions: (value: string) => void;
 	setAutoRunDisabled: (value: boolean) => void;
 	setDotfilesToggleHidden: (value: boolean) => void;
@@ -683,6 +685,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		showSessionCostPill: true,
 		showWorktreePill: false,
 		showWorktreeBranchName: false,
+		showLeftPanelGroupMemberCount: false,
 		moderatorStandingInstructions: '',
 		autoRunDisabled: false,
 		dotfilesToggleHidden: false,
@@ -1273,6 +1276,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		setShowWorktreeBranchName: (value) => {
 			set({ showWorktreeBranchName: value });
 			window.maestro.settings.set('showWorktreeBranchName', value);
+		},
+
+		setShowLeftPanelGroupMemberCount: (value) => {
+			set({ showLeftPanelGroupMemberCount: value });
+			window.maestro.settings.set('showLeftPanelGroupMemberCount', value);
 		},
 
 		setModeratorStandingInstructions: (value) => {
@@ -2452,6 +2460,9 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['showWorktreeBranchName'] !== undefined)
 			patch.showWorktreeBranchName = allSettings['showWorktreeBranchName'] as boolean;
 
+		if (allSettings['showLeftPanelGroupMemberCount'] !== undefined)
+			patch.showLeftPanelGroupMemberCount = allSettings['showLeftPanelGroupMemberCount'] as boolean;
+
 		if (allSettings['moderatorStandingInstructions'] !== undefined)
 			patch.moderatorStandingInstructions = allSettings['moderatorStandingInstructions'] as string;
 
@@ -2628,6 +2639,7 @@ export function getSettingsActions() {
 		setShowSessionCostPill: state.setShowSessionCostPill,
 		setShowWorktreePill: state.setShowWorktreePill,
 		setShowWorktreeBranchName: state.setShowWorktreeBranchName,
+		setShowLeftPanelGroupMemberCount: state.setShowLeftPanelGroupMemberCount,
 		setModeratorStandingInstructions: state.setModeratorStandingInstructions,
 		setSpellCheck: state.setSpellCheck,
 		setAutoRunDisabled: state.setAutoRunDisabled,

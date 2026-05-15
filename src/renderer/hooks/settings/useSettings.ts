@@ -382,6 +382,10 @@ export interface UseSettingsReturn {
 	showWorktreeBranchName: boolean;
 	setShowWorktreeBranchName: (value: boolean) => void;
 
+	// Left side panel
+	showLeftPanelGroupMemberCount: boolean;
+	setShowLeftPanelGroupMemberCount: (value: boolean) => void;
+
 	// Group Chat settings
 	moderatorStandingInstructions: string;
 	setModeratorStandingInstructions: (value: string) => void;
