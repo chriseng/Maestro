@@ -15,6 +15,7 @@
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import type { Theme } from '../../types';
 import { useModalLayer } from '../../hooks/ui/useModalLayer';
 import { MODAL_PRIORITIES } from '../../constants/modalPriorities';
@@ -38,10 +39,23 @@ export function ImageAnnotator({ theme }: ImageAnnotatorProps) {
 	const onSave = useImageAnnotatorStore((s) => s.onSave);
 	const closeAnnotator = useImageAnnotatorStore((s) => s.closeAnnotator);
 
+	const [drawerOpen, setDrawerOpen] = useState(false);
+
 	// Remount canvas + state on each open so a fresh session starts clean.
 	const sessionKey = useMemo(() => (isOpen ? imageDataUrl : null), [isOpen, imageDataUrl]);
 
-	useModalLayer(MODAL_PRIORITIES.IMAGE_ANNOTATOR, 'Image Annotator', closeAnnotator, {
+	// Escape closes the settings drawer first if it's open, then the modal.
+	const drawerOpenRef = useRef(drawerOpen);
+	drawerOpenRef.current = drawerOpen;
+	const handleEscape = useCallback(() => {
+		if (drawerOpenRef.current) {
+			setDrawerOpen(false);
+			return;
+		}
+		closeAnnotator();
+	}, [closeAnnotator, setDrawerOpen]);
+
+	useModalLayer(MODAL_PRIORITIES.IMAGE_ANNOTATOR, 'Image Annotator', handleEscape, {
 		focusTrap: 'lenient',
 		enabled: isOpen,
 	});
@@ -57,6 +71,8 @@ export function ImageAnnotator({ theme }: ImageAnnotatorProps) {
 			imageDataUrl={imageDataUrl}
 			onSave={onSave}
 			closeAnnotator={closeAnnotator}
+			drawerOpen={drawerOpen}
+			setDrawerOpen={setDrawerOpen}
 		/>
 	);
 }
@@ -66,6 +82,8 @@ interface ImageAnnotatorContentProps {
 	imageDataUrl: string;
 	onSave: ((newDataUrl: string) => void) | null;
 	closeAnnotator: () => void;
+	drawerOpen: boolean;
+	setDrawerOpen: Dispatch<SetStateAction<boolean>>;
 }
 
 function ImageAnnotatorContent({
@@ -73,10 +91,11 @@ function ImageAnnotatorContent({
 	imageDataUrl,
 	onSave,
 	closeAnnotator,
+	drawerOpen,
+	setDrawerOpen,
 }: ImageAnnotatorContentProps) {
 	const state = useAnnotatorState();
 	const svgRef = useRef<SVGSVGElement>(null);
-	const [drawerOpen, setDrawerOpen] = useState(false);
 
 	const composite = useCallback(async (): Promise<string | null> => {
 		const svg = svgRef.current;
