@@ -635,6 +635,30 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 				]
 			: []),
 		{ id: 'createGroup', label: 'Create New Group', action: handleCreateGroup },
+		...(groups.some((g) => g.collapsed)
+			? [
+					{
+						id: 'expandAllGroups',
+						label: 'Expand All Agent Groups',
+						action: () => {
+							setGroups((prev) => prev.map((g) => (g.collapsed ? { ...g, collapsed: false } : g)));
+							setQuickActionOpen(false);
+						},
+					},
+				]
+			: []),
+		...(groups.some((g) => !g.collapsed)
+			? [
+					{
+						id: 'collapseAllGroups',
+						label: 'Collapse All Agent Groups',
+						action: () => {
+							setGroups((prev) => prev.map((g) => (g.collapsed ? g : { ...g, collapsed: true })));
+							setQuickActionOpen(false);
+						},
+					},
+				]
+			: []),
 		{
 			id: 'toggleSidebar',
 			label: 'Toggle Sidebar',
