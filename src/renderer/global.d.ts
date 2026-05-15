@@ -1327,6 +1327,7 @@ interface MaestroAPI {
 				groupId?: string;
 			}) => void
 		) => () => void;
+		onGlobalHotkeyRegistrationFailed: (callback: (keys: string[]) => void) => () => void;
 	};
 	platform: string;
 	logger: {

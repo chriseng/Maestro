@@ -270,6 +270,7 @@ function getBadgeLevelForTime(cumulativeTimeMs: number): number {
 export interface SettingsStoreState {
 	settingsLoaded: boolean;
 	conductorProfile: string;
+	globalShowHotkey: string[];
 	llmProvider: LLMProvider;
 	modelSlug: string;
 	apiKey: string;
@@ -393,6 +394,7 @@ export interface SettingsStoreState {
 export interface SettingsStoreActions {
 	// Simple setters
 	setConductorProfile: (value: string) => void;
+	setGlobalShowHotkey: (value: string[]) => void;
 	setLlmProvider: (value: LLMProvider) => void;
 	setModelSlug: (value: string) => void;
 	setApiKey: (value: string) => void;
@@ -578,6 +580,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 
 		settingsLoaded: false,
 		conductorProfile: '',
+		globalShowHotkey: [],
 		llmProvider: 'openrouter',
 		modelSlug: 'anthropic/claude-3.5-sonnet',
 		apiKey: '',
@@ -705,6 +708,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 			const trimmed = value.slice(0, 5000);
 			set({ conductorProfile: trimmed });
 			window.maestro.settings.set('conductorProfile', trimmed);
+		},
+
+		setGlobalShowHotkey: (value) => {
+			set({ globalShowHotkey: value });
+			window.maestro.settings.set('globalShowHotkey', value);
 		},
 
 		setLlmProvider: (value) => {
@@ -1915,6 +1923,9 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['conductorProfile'] !== undefined)
 			patch.conductorProfile = allSettings['conductorProfile'] as string;
 
+		if (Array.isArray(allSettings['globalShowHotkey']))
+			patch.globalShowHotkey = allSettings['globalShowHotkey'] as string[];
+
 		if (allSettings['llmProvider'] !== undefined)
 			patch.llmProvider = allSettings['llmProvider'] as LLMProvider;
 
@@ -2511,6 +2522,7 @@ export function getSettingsActions() {
 	const state = useSettingsStore.getState();
 	return {
 		setConductorProfile: state.setConductorProfile,
+		setGlobalShowHotkey: state.setGlobalShowHotkey,
 		setLlmProvider: state.setLlmProvider,
 		setModelSlug: state.setModelSlug,
 		setApiKey: state.setApiKey,

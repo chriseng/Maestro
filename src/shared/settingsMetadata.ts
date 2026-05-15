@@ -235,6 +235,13 @@ export const SETTINGS_METADATA: Record<string, SettingMetadata> = {
 		default: '',
 		category: 'editor',
 	},
+	globalShowHotkey: {
+		description:
+			'System-wide hotkey to summon (show + focus) the Maestro window from any app. Empty array disables it. Stored as a key array (e.g. ["Meta","Shift","M"]); Meta maps to Cmd on macOS / Win on Windows.',
+		type: 'array',
+		default: [],
+		category: 'accessibility',
+	},
 	enterToSendAI: {
 		description:
 			'When true, pressing Enter sends messages in AI mode. When false, Ctrl+Enter sends.',

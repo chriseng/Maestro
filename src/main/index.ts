@@ -13,6 +13,11 @@ import { getAgentDefinition } from './agents/definitions';
 import { DEFAULT_CONTEXT_WINDOWS, FALLBACK_CONTEXT_WINDOW } from '../shared/agentConstants';
 import { shouldDropSentryEvent } from '../shared/sentryFilters';
 import type { AgentId } from '../shared/agentIds';
+import {
+	initGlobalHotkey,
+	setGlobalShowHotkey,
+	disposeGlobalHotkey,
+} from './global-hotkey-manager';
 import { CueEngine } from './cue/cue-engine';
 import { configureCueTelemetry } from './cue/cue-telemetry';
 import {
@@ -959,6 +964,28 @@ app
 		// Create main window
 		logger.info('Creating main window', 'Startup');
 		createWindow();
+
+		// Wire the global "summon Maestro" hotkey. Register the saved binding (if
+		// any) and re-register live when the setting changes from any source
+		// (settings UI, CLI, external file edit).
+		initGlobalHotkey(() => mainWindow);
+		const initialHotkey = store.get('globalShowHotkey', []) as string[];
+		if (Array.isArray(initialHotkey) && initialHotkey.length > 0) {
+			const ok = setGlobalShowHotkey(initialHotkey);
+			if (!ok && mainWindow && isWebContentsAvailable(mainWindow)) {
+				mainWindow.webContents.send('globalHotkey:registrationFailed', initialHotkey);
+			}
+		}
+		store.onDidChange('globalShowHotkey', (value) => {
+			const keys = Array.isArray(value) ? (value as string[]) : [];
+			const ok = setGlobalShowHotkey(keys);
+			if (!ok && mainWindow && isWebContentsAvailable(mainWindow)) {
+				mainWindow.webContents.send('globalHotkey:registrationFailed', keys);
+			}
+		});
+		// Electron auto-unregisters globalShortcuts on quit, but be explicit so the
+		// behavior survives any future change to that policy.
+		app.on('will-quit', disposeGlobalHotkey);
 
 		// Flush any deep link URL that arrived before the window was ready (cold start)
 		flushPendingDeepLink(() => mainWindow);

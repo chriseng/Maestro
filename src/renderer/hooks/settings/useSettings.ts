@@ -37,6 +37,8 @@ import {
 } from '../../stores/settingsStore';
 import type { SettingsStore } from '../../stores/settingsStore';
 import type { DocumentGraphLayoutType } from '../../stores/settingsStore';
+import { notifyToast } from '../../stores/notificationStore';
+import { formatShortcutKeys } from '../../utils/shortcutFormatter';
 import { logger } from '../../utils/logger';
 
 export interface UseSettingsReturn {
@@ -46,6 +48,10 @@ export interface UseSettingsReturn {
 	// Conductor Profile (About Me)
 	conductorProfile: string;
 	setConductorProfile: (value: string) => void;
+
+	// Global show-Maestro hotkey (system-wide). Empty array = unset.
+	globalShowHotkey: string[];
+	setGlobalShowHotkey: (value: string[]) => void;
 
 	// LLM settings
 	llmProvider: LLMProvider;
@@ -454,6 +460,23 @@ export function useSettings(): UseSettingsReturn {
 			document.documentElement.style.fontSize = `${store.fontSize}px`;
 		}
 	}, [store.fontSize, store.settingsLoaded]);
+
+	// Surface global-hotkey registration failures (e.g. combo already owned by
+	// another app). Mounted here so the toast fires even when Settings is closed.
+	useEffect(() => {
+		if (!window.maestro?.app?.onGlobalHotkeyRegistrationFailed) return;
+		const cleanup = window.maestro.app.onGlobalHotkeyRegistrationFailed((keys) => {
+			const combo = keys.length > 0 ? formatShortcutKeys(keys) : '(none)';
+			logger.warn(`[Settings] Global hotkey registration failed: ${combo}`);
+			notifyToast({
+				color: 'orange',
+				title: 'Global hotkey unavailable',
+				message: `${combo} is already in use by another app. Pick a different combo in Settings → General.`,
+				dismissible: true,
+			});
+		});
+		return cleanup;
+	}, []);
 
 	return {
 		...store,
