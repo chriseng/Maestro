@@ -111,6 +111,7 @@ export interface AppModalsProps {
 	) => void;
 	existingSessions: Session[];
 	duplicatingSessionId?: string | null; // Session ID to duplicate from
+	newInstancePresetGroupId?: string | null; // Group to place the new agent in
 	onCloseEditAgentModal: () => void;
 	onSaveEditAgent: (
 		sessionId: string,
@@ -549,6 +550,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 		onCreateSession,
 		existingSessions,
 		duplicatingSessionId,
+		newInstancePresetGroupId,
 		onCloseEditAgentModal,
 		onSaveEditAgent,
 		editAgentSession,
@@ -846,6 +848,7 @@ export const AppModals = memo(function AppModals(props: AppModalsProps) {
 				onCreateSession={onCreateSession}
 				existingSessions={existingSessions}
 				sourceSession={sourceSession}
+				newInstancePresetGroupId={newInstancePresetGroupId}
 				editAgentModalOpen={editAgentModalOpen}
 				onCloseEditAgentModal={onCloseEditAgentModal}
 				onSaveEditAgent={onSaveEditAgent}

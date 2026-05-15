@@ -132,6 +132,10 @@ const mockModalActions = {
 	setRenameInstanceModalOpen: vi.fn(),
 	setRenameInstanceValue: vi.fn(),
 	setRenameInstanceSessionId: vi.fn(),
+	setRenameGroupModalOpen: vi.fn(),
+	setRenameGroupId: vi.fn(),
+	setRenameGroupValue: vi.fn(),
+	setRenameGroupEmoji: vi.fn(),
 };
 
 vi.mock('../../../renderer/stores/modalStore', async (importActual) => {
@@ -890,6 +894,116 @@ describe('SessionList', () => {
 			// Button should be standalone (full-width style)
 			const newGroupButton = screen.getByText('New Group').closest('button');
 			expect(newGroupButton).toHaveClass('w-full');
+		});
+	});
+
+	// ============================================================================
+	// Group Context Menu Tests
+	// ============================================================================
+
+	describe('Group Context Menu', () => {
+		it('opens context menu on right-click of a group header', () => {
+			const group = createMockGroup({ id: 'g1', name: 'My Group', emoji: '🚀' });
+			const sessions = [createMockSession({ id: 's1', name: 'Session', groupId: 'g1' })];
+			useSessionStore.setState({ sessions, groups: [group] });
+			useUIStore.setState({ leftSidebarOpen: true });
+			const props = createDefaultProps({ sortedSessions: sessions });
+			render(<SessionList {...props} />);
+
+			fireEvent.contextMenu(screen.getByText('My Group'), { clientX: 100, clientY: 100 });
+
+			expect(screen.getByText('Rename Group...')).toBeInTheDocument();
+			expect(screen.getByText('New Agent in Group...')).toBeInTheDocument();
+		});
+
+		it('opens rename group modal when "Rename Group..." is clicked', () => {
+			const group = createMockGroup({ id: 'g1', name: 'My Group', emoji: '🚀' });
+			useSessionStore.setState({ sessions: [], groups: [group] });
+			useUIStore.setState({ leftSidebarOpen: true });
+			const props = createDefaultProps({ sortedSessions: [] });
+			render(<SessionList {...props} />);
+
+			fireEvent.contextMenu(screen.getByText('My Group'), { clientX: 100, clientY: 100 });
+			fireEvent.click(screen.getByText('Rename Group...'));
+
+			expect(mockModalActions.setRenameGroupId).toHaveBeenCalledWith('g1');
+			expect(mockModalActions.setRenameGroupValue).toHaveBeenCalledWith('My Group');
+			expect(mockModalActions.setRenameGroupEmoji).toHaveBeenCalledWith('🚀');
+			expect(mockModalActions.setRenameGroupModalOpen).toHaveBeenCalledWith(true);
+		});
+
+		it('opens newInstance modal with presetGroupId when "New Agent in Group..." is clicked', () => {
+			const group = createMockGroup({ id: 'g1', name: 'My Group' });
+			useSessionStore.setState({ sessions: [], groups: [group] });
+			useUIStore.setState({ leftSidebarOpen: true });
+			const props = createDefaultProps({ sortedSessions: [] });
+			render(<SessionList {...props} />);
+
+			fireEvent.contextMenu(screen.getByText('My Group'), { clientX: 100, clientY: 100 });
+			fireEvent.click(screen.getByText('New Agent in Group...'));
+
+			expect(useModalStore.getState().isOpen('newInstance')).toBe(true);
+			const modalData = useModalStore.getState().getData('newInstance');
+			expect(modalData).toMatchObject({
+				duplicatingSessionId: null,
+				presetGroupId: 'g1',
+			});
+		});
+
+		it('expands a collapsed group when creating a new agent in it', () => {
+			const toggleGroup = vi.fn();
+			const group = createMockGroup({ id: 'g1', name: 'My Group', collapsed: true });
+			useSessionStore.setState({ sessions: [], groups: [group] });
+			useUIStore.setState({ leftSidebarOpen: true });
+			const props = createDefaultProps({ sortedSessions: [], toggleGroup });
+			render(<SessionList {...props} />);
+
+			fireEvent.contextMenu(screen.getByText('My Group'), { clientX: 100, clientY: 100 });
+			fireEvent.click(screen.getByText('New Agent in Group...'));
+
+			expect(toggleGroup).toHaveBeenCalledWith('g1');
+		});
+
+		it('shows Delete Group when the group is empty', () => {
+			const group = createMockGroup({ id: 'g1', name: 'Empty Group' });
+			useSessionStore.setState({ sessions: [], groups: [group] });
+			useUIStore.setState({ leftSidebarOpen: true });
+			const props = createDefaultProps({ sortedSessions: [] });
+			render(<SessionList {...props} />);
+
+			fireEvent.contextMenu(screen.getByText('Empty Group'), { clientX: 100, clientY: 100 });
+
+			expect(screen.getByText('Delete Group')).toBeInTheDocument();
+		});
+
+		it('does not show Delete option for a non-empty non-worktree group', () => {
+			const group = createMockGroup({ id: 'g1', name: 'My Group', emoji: '🚀' });
+			const sessions = [createMockSession({ id: 's1', name: 'Session', groupId: 'g1' })];
+			useSessionStore.setState({ sessions, groups: [group] });
+			useUIStore.setState({ leftSidebarOpen: true });
+			const props = createDefaultProps({ sortedSessions: sessions });
+			render(<SessionList {...props} />);
+
+			fireEvent.contextMenu(screen.getByText('My Group'), { clientX: 100, clientY: 100 });
+
+			expect(screen.queryByText('Delete Group')).not.toBeInTheDocument();
+			expect(screen.queryByText('Remove Group and Agents')).not.toBeInTheDocument();
+		});
+
+		it('shows "Remove Group and Agents" for a non-empty worktree group', () => {
+			const group = createMockGroup({ id: 'g1', name: 'Worktree Group', emoji: '🌳' });
+			const sessions = [createMockSession({ id: 's1', name: 'Session', groupId: 'g1' })];
+			useSessionStore.setState({ sessions, groups: [group] });
+			useUIStore.setState({ leftSidebarOpen: true });
+			const props = createDefaultProps({
+				sortedSessions: sessions,
+				onDeleteWorktreeGroup: vi.fn(),
+			});
+			render(<SessionList {...props} />);
+
+			fireEvent.contextMenu(screen.getByText('Worktree Group'), { clientX: 100, clientY: 100 });
+
+			expect(screen.getByText('Remove Group and Agents')).toBeInTheDocument();
 		});
 	});
 

@@ -18,6 +18,7 @@ import {
 	Clock,
 	RotateCw,
 	FileText,
+	Globe,
 	Edit2,
 	Trash2,
 	AlertTriangle,
@@ -472,6 +473,13 @@ interface FileExplorerPanelProps {
 	setShowHiddenFiles: (value: boolean) => void;
 	/** Callback to open graph view focused on a specific file (relative path to session.cwd) */
 	onFocusFileInGraph?: (relativePath: string) => void;
+	/**
+	 * Opens a new in-app browser tab pointed at the given URL. Used by the
+	 * "Open in Maestro Browser" context-menu action so JS-heavy local HTML
+	 * (Plotly dashboards, etc.) renders in the full Electron webview instead
+	 * of the sandboxed file-preview iframe.
+	 */
+	onOpenBrowserTabAt?: (url: string, options?: { title?: string }) => void;
 }
 
 function FileExplorerPanelInner(props: FileExplorerPanelProps) {
@@ -504,6 +512,7 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		fileExplorerIconTheme,
 		setShowHiddenFiles,
 		onFocusFileInGraph,
+		onOpenBrowserTabAt,
 	} = props;
 
 	const shortcuts = useSettingsStore((s) => s.shortcuts);
@@ -741,6 +750,25 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		}
 		setContextMenu(null);
 	}, [contextMenu, session.fullPath]);
+
+	// Open the file in a new in-app browser tab. The file-preview iframe uses
+	// `srcDoc` + a tight sandbox that gives scripts an opaque origin and no
+	// base URL, which breaks JS-heavy dashboards (Plotly, etc.); the browser
+	// tab uses a full Electron webview where everything just works.
+	const handleOpenInMaestroBrowser = useCallback(() => {
+		if (contextMenu && contextMenu.node.type === 'file' && onOpenBrowserTabAt) {
+			const absolutePath = `${session.fullPath}/${contextMenu.path}`;
+			// Encode each path segment so spaces and other reserved chars
+			// don't break the file:// URL.
+			const encodedPath = absolutePath
+				.split('/')
+				.map((seg) => encodeURIComponent(seg))
+				.join('/');
+			const url = `file://${encodedPath}`;
+			onOpenBrowserTabAt(url, { title: contextMenu.node.name });
+		}
+		setContextMenu(null);
+	}, [contextMenu, onOpenBrowserTabAt, session.fullPath]);
 
 	const handleOpenInExplorer = useCallback(() => {
 		if (contextMenu) {
@@ -1680,6 +1708,18 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 										<span>Document Graph</span>
 									</button>
 								)}
+
+							{/* Open in Maestro Browser - for files only, not over SSH (file:// won't reach the remote) */}
+							{contextMenu.node.type === 'file' && !sshRemoteId && onOpenBrowserTabAt && (
+								<button
+									onClick={handleOpenInMaestroBrowser}
+									className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-xs hover:bg-white/10 transition-colors"
+									style={{ color: theme.colors.textMain }}
+								>
+									<Globe className="w-3.5 h-3.5" style={{ color: theme.colors.accent }} />
+									<span>Open in Maestro Browser</span>
+								</button>
+							)}
 
 							{/* Open in Default App option - for files only, not available over SSH */}
 							{contextMenu.node.type === 'file' && !sshRemoteId && (

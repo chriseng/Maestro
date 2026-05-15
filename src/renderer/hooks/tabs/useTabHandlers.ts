@@ -153,6 +153,7 @@ export interface TabHandlersReturn {
 
 	// Browser Tab handlers
 	handleNewBrowserTab: () => void;
+	handleOpenBrowserTabAt: (url: string, options?: { title?: string }) => void;
 	handleSelectBrowserTab: (tabId: string) => void;
 	handleCloseBrowserTab: (tabId: string) => void;
 	handleUpdateBrowserTab: (sessionId: string, tabId: string, updates: Partial<BrowserTab>) => void;
@@ -746,6 +747,45 @@ export function useTabHandlers(): TabHandlersReturn {
 					canGoBack: false,
 					canGoForward: false,
 					isLoading: url !== DEFAULT_BROWSER_TAB_URL,
+					favicon: null,
+				};
+
+				return {
+					...s,
+					browserTabs: [...(s.browserTabs || []), newBrowserTab],
+					activeFileTabId: null,
+					activeBrowserTabId: newBrowserTab.id,
+					activeTerminalTabId: null,
+					inputMode: 'ai',
+					unifiedTabOrder: insertAfterActiveInUnifiedTabOrder(s, {
+						type: 'browser',
+						id: newBrowserTab.id,
+					}),
+				};
+			})
+		);
+	}, []);
+
+	// Open a new browser tab pointed at a specific URL. Used by file-tree
+	// "Open in Maestro Browser" so JS-heavy local HTML (Plotly dashboards, etc.)
+	// renders in the full Electron webview instead of the sandboxed file preview
+	// iframe.
+	const handleOpenBrowserTabAt = useCallback((url: string, options?: { title?: string }) => {
+		if (!url) return;
+		const { setSessions, activeSessionId } = useSessionStore.getState();
+		setSessions((prev: Session[]) =>
+			prev.map((s) => {
+				if (s.id !== activeSessionId) return s;
+
+				const newBrowserTab: BrowserTab = {
+					id: generateId(),
+					url,
+					title: options?.title ?? url,
+					createdAt: Date.now(),
+					partition: getBrowserTabPartition(s.id),
+					canGoBack: false,
+					canGoForward: false,
+					isLoading: true,
 					favicon: null,
 				};
 
@@ -1857,6 +1897,7 @@ export function useTabHandlers(): TabHandlersReturn {
 
 		// Browser Tab handlers
 		handleNewBrowserTab,
+		handleOpenBrowserTabAt,
 		handleSelectBrowserTab,
 		handleCloseBrowserTab,
 		handleUpdateBrowserTab,

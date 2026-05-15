@@ -39,6 +39,7 @@ import { useGroupChatStore } from '../../stores/groupChatStore';
 import { useInlineWizardContext } from '../../contexts/InlineWizardContext';
 import { getModalActions, useModalStore } from '../../stores/modalStore';
 import { SessionContextMenu } from './SessionContextMenu';
+import { GroupContextMenu } from './GroupContextMenu';
 import { WizardIndicator } from './WizardIndicator';
 import { HamburgerMenuContent } from './HamburgerMenuContent';
 import { CollapsedSessionPillRows } from './CollapsedSessionPill';
@@ -392,6 +393,19 @@ function SessionListInner(props: SessionListProps) {
 	const contextMenuSession = contextMenu
 		? sessions.find((s) => s.id === contextMenu.sessionId)
 		: null;
+
+	// Group context menu state — opened by right-clicking a group header
+	const [groupContextMenu, setGroupContextMenu] = useState<{
+		x: number;
+		y: number;
+		groupId: string;
+	} | null>(null);
+	const groupContextMenuGroup = groupContextMenu
+		? groups.find((g) => g.id === groupContextMenu.groupId)
+		: null;
+	const groupContextMenuMemberCount = groupContextMenu
+		? sessions.filter((s) => s.groupId === groupContextMenu.groupId && !s.parentSessionId).length
+		: 0;
 	const menuRef = useRef<HTMLDivElement>(null);
 	const ignoreNextBlurRef = useRef(false);
 
@@ -410,6 +424,12 @@ function SessionListInner(props: SessionListProps) {
 		e.preventDefault();
 		e.stopPropagation();
 		setContextMenu({ x: e.clientX, y: e.clientY, sessionId });
+	}, []);
+
+	const handleGroupContextMenu = useCallback((e: React.MouseEvent, groupId: string) => {
+		e.preventDefault();
+		e.stopPropagation();
+		setGroupContextMenu({ x: e.clientX, y: e.clientY, groupId });
 	}, []);
 
 	const handleMoveToGroup = useCallback(
@@ -1080,6 +1100,7 @@ function SessionListInner(props: SessionListProps) {
 									}}
 									className="px-3 py-1.5 flex items-center justify-between cursor-pointer hover:bg-opacity-50 group"
 									onClick={() => toggleGroup(group.id)}
+									onContextMenu={(e) => handleGroupContextMenu(e, group.id)}
 									onDragOver={handleDragOver}
 									onDrop={() => handleDropOnGroup(group.id)}
 								>
@@ -1446,6 +1467,50 @@ function SessionListInner(props: SessionListProps) {
 							: createNewGroup
 					}
 					onConfigureCue={onConfigureCue ? () => onConfigureCue(contextMenuSession) : undefined}
+				/>
+			)}
+
+			{/* Group Context Menu */}
+			{groupContextMenu && groupContextMenuGroup && (
+				<GroupContextMenu
+					x={groupContextMenu.x}
+					y={groupContextMenu.y}
+					theme={theme}
+					group={groupContextMenuGroup}
+					memberCount={groupContextMenuMemberCount}
+					onRename={() => {
+						const modalActions = getModalActions();
+						modalActions.setRenameGroupId(groupContextMenuGroup.id);
+						modalActions.setRenameGroupValue(groupContextMenuGroup.name);
+						modalActions.setRenameGroupEmoji(groupContextMenuGroup.emoji);
+						modalActions.setRenameGroupModalOpen(true);
+					}}
+					onNewAgent={() => {
+						// Expand the group so the new agent is visible when it lands here.
+						if (groupContextMenuGroup.collapsed) {
+							toggleGroup(groupContextMenuGroup.id);
+						}
+						useModalStore.getState().openModal('newInstance', {
+							duplicatingSessionId: null,
+							presetGroupId: groupContextMenuGroup.id,
+						});
+					}}
+					onDelete={
+						// Worktree groups always cascade-delete (handler removes agents).
+						// Non-worktree groups can only be deleted when empty.
+						groupContextMenuGroup.emoji === '🌳' && onDeleteWorktreeGroup
+							? () => onDeleteWorktreeGroup(groupContextMenuGroup.id)
+							: groupContextMenuMemberCount === 0
+								? () =>
+										showConfirmation(
+											`Are you sure you want to delete the group "${groupContextMenuGroup.name}"?`,
+											() => {
+												setGroups((prev) => prev.filter((g) => g.id !== groupContextMenuGroup.id));
+											}
+										)
+								: undefined
+					}
+					onDismiss={() => setGroupContextMenu(null)}
 				/>
 			)}
 		</div>

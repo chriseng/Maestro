@@ -23,6 +23,7 @@ export function NewInstanceModal({
 	theme,
 	existingSessions,
 	sourceSession,
+	presetGroupId,
 }: NewInstanceModalProps) {
 	const [agents, setAgents] = useState<AgentConfig[]>([]);
 	const [selectedAgent, setSelectedAgent] = useState('');
@@ -415,8 +416,10 @@ export function NewInstanceModal({
 					};
 
 		// Inherit the source session's group when duplicating so the copy lands
-		// alongside the original (issue #827).
-		const inheritedGroupId = sourceSession?.groupId;
+		// alongside the original (issue #827). When not duplicating, honor an
+		// explicit presetGroupId from the caller (e.g. "New Agent in Group"
+		// from the group context menu).
+		const targetGroupId = sourceSession?.groupId ?? presetGroupId ?? undefined;
 
 		onCreate(
 			selectedAgent,
@@ -432,7 +435,7 @@ export function NewInstanceModal({
 			agentCustomProviderPath,
 			sessionSshRemoteConfig,
 			agentCustomEffort,
-			inheritedGroupId
+			targetGroupId ?? undefined
 		);
 		onClose();
 
@@ -467,6 +470,7 @@ export function NewInstanceModal({
 		handleWorkingDirChange,
 		existingSessions,
 		sourceSession?.groupId,
+		presetGroupId,
 	]);
 
 	// Check if form is valid for submission

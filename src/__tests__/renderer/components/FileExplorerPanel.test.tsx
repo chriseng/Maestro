@@ -105,6 +105,11 @@ vi.mock('lucide-react', () => ({
 			✏️
 		</span>
 	),
+	Globe: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
+		<span data-testid="globe-icon" className={className} style={style}>
+			🌐
+		</span>
+	),
 	Trash2: ({ className, style }: { className?: string; style?: React.CSSProperties }) => (
 		<span data-testid="trash2-icon" className={className} style={style}>
 			🗑️
@@ -2151,6 +2156,66 @@ describe('FileExplorerPanel', () => {
 			fireEvent.click(openButton);
 
 			expect(mockShell.openPath).toHaveBeenCalledWith('/Users/test/project/package.json');
+		});
+
+		it('shows Open in Maestro Browser option when onOpenBrowserTabAt is provided', () => {
+			const onOpenBrowserTabAt = vi.fn();
+			const { container } = render(
+				<FileExplorerPanel {...defaultProps} onOpenBrowserTabAt={onOpenBrowserTabAt} />
+			);
+			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
+				el.textContent?.includes('package.json')
+			);
+			fireEvent.contextMenu(fileItem!, { clientX: 100, clientY: 200 });
+
+			expect(screen.getByText('Open in Maestro Browser')).toBeInTheDocument();
+		});
+
+		it('does not show Open in Maestro Browser option when handler is missing', () => {
+			const { container } = render(<FileExplorerPanel {...defaultProps} />);
+			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
+				el.textContent?.includes('package.json')
+			);
+			fireEvent.contextMenu(fileItem!, { clientX: 100, clientY: 200 });
+
+			expect(screen.queryByText('Open in Maestro Browser')).not.toBeInTheDocument();
+		});
+
+		it('calls onOpenBrowserTabAt with a file:// URL when Open in Maestro Browser is clicked', () => {
+			const onOpenBrowserTabAt = vi.fn();
+			const { container } = render(
+				<FileExplorerPanel {...defaultProps} onOpenBrowserTabAt={onOpenBrowserTabAt} />
+			);
+			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
+				el.textContent?.includes('package.json')
+			);
+			fireEvent.contextMenu(fileItem!, { clientX: 100, clientY: 200 });
+
+			fireEvent.click(screen.getByText('Open in Maestro Browser'));
+
+			expect(onOpenBrowserTabAt).toHaveBeenCalledWith('file:///Users/test/project/package.json', {
+				title: 'package.json',
+			});
+		});
+
+		it('does not show Open in Maestro Browser option for SSH sessions', () => {
+			const sshSession = createMockSession({
+				sshRemoteId: 'ssh-remote-123',
+			});
+			const onOpenBrowserTabAt = vi.fn();
+			const { container } = render(
+				<FileExplorerPanel
+					{...defaultProps}
+					session={sshSession}
+					onOpenBrowserTabAt={onOpenBrowserTabAt}
+				/>
+			);
+			const fileItem = Array.from(container.querySelectorAll('[data-file-index]')).find((el) =>
+				el.textContent?.includes('package.json')
+			);
+			fireEvent.contextMenu(fileItem!, { clientX: 100, clientY: 200 });
+
+			expect(screen.queryByText('Open in Maestro Browser')).not.toBeInTheDocument();
 		});
 
 		it('does not show Open in Default App option for SSH sessions', () => {

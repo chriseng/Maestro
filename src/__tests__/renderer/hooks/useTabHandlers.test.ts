@@ -925,6 +925,44 @@ describe('useTabHandlers', () => {
 			});
 		});
 
+		it('handleOpenBrowserTabAt opens a browser tab at a specific URL', () => {
+			const aiTab = createMockAITab({ id: 'ai-1' });
+			setupSessionWithTabs([aiTab], [], 'ai-1', null);
+
+			const { result } = renderHook(() => useTabHandlers());
+			act(() => {
+				result.current.handleOpenBrowserTabAt('file:///tmp/dashboard.html', {
+					title: 'dashboard.html',
+				});
+			});
+
+			const session = getSession();
+			expect(session.browserTabs).toHaveLength(1);
+			expect(session.browserTabs[0]).toMatchObject({
+				url: 'file:///tmp/dashboard.html',
+				title: 'dashboard.html',
+				isLoading: true,
+				favicon: null,
+				partition: 'persist:maestro-browser-session-test-session',
+			});
+			expect(session.activeBrowserTabId).toBe(session.browserTabs[0].id);
+			expect(session.activeFileTabId).toBeNull();
+			expect(session.inputMode).toBe('ai');
+		});
+
+		it('handleOpenBrowserTabAt no-ops on empty URL', () => {
+			const aiTab = createMockAITab({ id: 'ai-1' });
+			setupSessionWithTabs([aiTab], [], 'ai-1', null);
+
+			const { result } = renderHook(() => useTabHandlers());
+			act(() => {
+				result.current.handleOpenBrowserTabAt('');
+			});
+
+			const session = getSession();
+			expect(session.browserTabs ?? []).toHaveLength(0);
+		});
+
 		it('handleSelectBrowserTab activates an existing browser tab and repairs unified order', () => {
 			const aiTab = createMockAITab({ id: 'ai-1' });
 			const browserTab = createMockBrowserTab({ id: 'browser-1' });

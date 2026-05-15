@@ -46,6 +46,7 @@ export interface AppSessionModalsProps {
 	) => void;
 	existingSessions: Session[];
 	sourceSession?: Session; // For agent duplication
+	newInstancePresetGroupId?: string | null; // Group to place the new agent in
 
 	// EditAgentModal
 	editAgentModalOpen: boolean;
@@ -112,6 +113,7 @@ export const AppSessionModals = memo(function AppSessionModals({
 	onCreateSession,
 	existingSessions,
 	sourceSession,
+	newInstancePresetGroupId,
 	// EditAgentModal
 	editAgentModalOpen,
 	onCloseEditAgentModal,
@@ -175,6 +177,7 @@ export const AppSessionModals = memo(function AppSessionModals({
 					theme={theme}
 					existingSessions={existingSessions}
 					sourceSession={sourceSession}
+					presetGroupId={newInstancePresetGroupId}
 				/>
 			)}
 

@@ -203,6 +203,7 @@ function MaestroConsoleInner() {
 		// New Instance Modal
 		newInstanceModalOpen,
 		duplicatingSessionId,
+		newInstancePresetGroupId,
 		// Edit Agent Modal
 		setEditAgentModalOpen,
 		editAgentSession,
@@ -839,6 +840,7 @@ function MaestroConsoleInner() {
 		handleCloseFileTab,
 		handleNewFileTab,
 		handleNewBrowserTab,
+		handleOpenBrowserTabAt,
 		handleSelectBrowserTab,
 		handleCloseBrowserTab,
 		handleUpdateBrowserTab,
@@ -2609,6 +2611,9 @@ function MaestroConsoleInner() {
 
 		// Document Graph handlers
 		handleFocusFileInGraph,
+
+		// Browser tab handler (used by file-tree "Open in Maestro Browser")
+		handleOpenBrowserTabAt,
 	});
 
 	return (
@@ -2757,6 +2762,7 @@ function MaestroConsoleInner() {
 					onCreateSession={createNewSession}
 					existingSessions={sessionsForValidation}
 					duplicatingSessionId={duplicatingSessionId}
+					newInstancePresetGroupId={newInstancePresetGroupId}
 					onCloseEditAgentModal={handleCloseEditAgentModal}
 					onSaveEditAgent={handleSaveEditAgent}
 					editAgentSession={editAgentSession}
