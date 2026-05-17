@@ -691,6 +691,34 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 					},
 				]
 			: []),
+		...(groups.some((g) => g.collapsed) ||
+		(sessions.some((s) => s.bookmarked) && bookmarksCollapsed)
+			? [
+					{
+						id: 'expandEntireAgentPanel',
+						label: 'Expand Entire Agent Panel',
+						action: () => {
+							setGroups((prev) => prev.map((g) => (g.collapsed ? { ...g, collapsed: false } : g)));
+							setBookmarksCollapsed(false);
+							setQuickActionOpen(false);
+						},
+					},
+				]
+			: []),
+		...(groups.some((g) => !g.collapsed) ||
+		(sessions.some((s) => s.bookmarked) && !bookmarksCollapsed)
+			? [
+					{
+						id: 'collapseEntireAgentPanel',
+						label: 'Collapse Entire Agent Panel',
+						action: () => {
+							setGroups((prev) => prev.map((g) => (g.collapsed ? g : { ...g, collapsed: true })));
+							setBookmarksCollapsed(true);
+							setQuickActionOpen(false);
+						},
+					},
+				]
+			: []),
 		{
 			id: 'toggleSidebar',
 			label: 'Toggle Sidebar',
