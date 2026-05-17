@@ -363,6 +363,10 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 	const setSuccessFlashNotification = useUIStore((s) => s.setSuccessFlashNotification);
 	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
 	const setBookmarksCollapsed = useUIStore((s) => s.setBookmarksCollapsed);
+	const ungroupedCollapsed = useSettingsStore((s) => s.ungroupedCollapsed);
+	const setUngroupedCollapsed = useSettingsStore((s) => s.setUngroupedCollapsed);
+	const groupChatsExpanded = useSettingsStore((s) => s.groupChatsExpanded);
+	const setGroupChatsExpanded = useSettingsStore((s) => s.setGroupChatsExpanded);
 	const activeBatchSessionIds = useBatchStore(useShallow(selectActiveBatchSessionIds));
 
 	const [search, setSearch] = useState('');
@@ -692,7 +696,9 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 				]
 			: []),
 		...(groups.some((g) => g.collapsed) ||
-		(sessions.some((s) => s.bookmarked) && bookmarksCollapsed)
+		(sessions.some((s) => s.bookmarked) && bookmarksCollapsed) ||
+		ungroupedCollapsed ||
+		!groupChatsExpanded
 			? [
 					{
 						id: 'expandEntireAgentPanel',
@@ -700,13 +706,17 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 						action: () => {
 							setGroups((prev) => prev.map((g) => (g.collapsed ? { ...g, collapsed: false } : g)));
 							setBookmarksCollapsed(false);
+							setUngroupedCollapsed(false);
+							setGroupChatsExpanded(true);
 							setQuickActionOpen(false);
 						},
 					},
 				]
 			: []),
 		...(groups.some((g) => !g.collapsed) ||
-		(sessions.some((s) => s.bookmarked) && !bookmarksCollapsed)
+		(sessions.some((s) => s.bookmarked) && !bookmarksCollapsed) ||
+		!ungroupedCollapsed ||
+		groupChatsExpanded
 			? [
 					{
 						id: 'collapseEntireAgentPanel',
@@ -714,6 +724,8 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 						action: () => {
 							setGroups((prev) => prev.map((g) => (g.collapsed ? g : { ...g, collapsed: true })));
 							setBookmarksCollapsed(true);
+							setUngroupedCollapsed(true);
+							setGroupChatsExpanded(false);
 							setQuickActionOpen(false);
 						},
 					},
