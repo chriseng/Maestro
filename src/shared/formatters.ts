@@ -532,6 +532,17 @@ export function abbreviateGroupName(
 	const max = options?.max ?? 10;
 	const trimmed = name.trim();
 	if (!trimmed) return trimmed;
+
+	// Bracketed tag prefix wins: "[ARP] Auditoria Relatório Pessoal" → "ARP".
+	// Users put their preferred short form in brackets; without this rule, the
+	// multi-word initials path below grabs only the leading "[" of the bracketed
+	// word, producing "[ARP" with the closing bracket lopped off (issue #1017).
+	const tagMatch = trimmed.match(/^\[([^\]]+)\]/);
+	if (tagMatch) {
+		const tag = tagMatch[1].trim();
+		if (tag && tag.length <= max) return tag;
+	}
+
 	if (trimmed.length <= max) return trimmed;
 
 	// Acronym joined by "&" — handles "A & B" and "A and B" forms.
