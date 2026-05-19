@@ -70,6 +70,7 @@ export interface BatchedUpdater {
 	updateContextUsage: (sessionId: string, percentage: number) => void;
 	updateCycleBytes: (sessionId: string, bytes: number) => void;
 	updateCycleTokens: (sessionId: string, tokens: number) => void;
+	flushNow: () => void;
 }
 
 /** Dependencies passed from App.tsx to the hook */
@@ -293,6 +294,14 @@ export function useAgentListeners(deps: UseAgentListenersDeps): void {
 					exitCode: code,
 					timestamp: new Date().toISOString(),
 				});
+
+				// Flush any pending batched stdout/stderr chunks before we mutate
+				// state. Without this, when a queued message is dispatched on exit
+				// the user log entry is appended ahead of the trailing chunks from
+				// the response that just finished, causing those chunks to fall
+				// after the new user message in tab.logs and merge with the next
+				// response's bubble in TerminalOutput's collapsedLogs grouping.
+				deps.batchedUpdater.flushNow();
 
 				let actualSessionId: string;
 				let isFromAi: boolean;
