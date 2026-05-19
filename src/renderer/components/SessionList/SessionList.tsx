@@ -534,6 +534,7 @@ function SessionListInner(props: SessionListProps) {
 		sortedBookmarkedSessions,
 		sortedBookmarkedParentSessions,
 		sortedGroupSessionsById,
+		ungroupedSessions,
 		sortedUngroupedSessions,
 		sortedUngroupedParentSessions,
 		sortedFilteredSessions,
@@ -1251,8 +1252,8 @@ function SessionListInner(props: SessionListProps) {
 								</div>
 							)}
 						</>
-					) : groups.length > 0 ? (
-						/* UNGROUPED FOLDER - Always shown when groups exist, even if empty */
+					) : groups.length > 0 && ungroupedSessions.length > 0 ? (
+						/* UNGROUPED FOLDER - Groups exist and there are ungrouped agents */
 						<div className="mb-1 mt-4">
 							<div
 								className="px-3 py-1.5 flex items-center justify-between cursor-pointer hover:bg-opacity-50 group"
@@ -1328,6 +1329,36 @@ function SessionListInner(props: SessionListProps) {
 									setActiveSessionId={setActiveSessionId}
 								/>
 							)}
+						</div>
+					) : groups.length > 0 && !showUnreadAgentsOnly ? (
+						/* NO UNGROUPED AGENTS - Show drop zone for ungrouping + New Group button */
+						<div className="mt-4 px-3" onDragOver={handleDragOver} onDrop={handleDropOnUngrouped}>
+							{/* Drop zone indicator when dragging */}
+							{draggingSessionId && (
+								<div
+									className="mb-2 px-3 py-2 rounded border-2 border-dashed text-center text-xs"
+									style={{
+										borderColor: theme.colors.accent,
+										color: theme.colors.textDim,
+										backgroundColor: theme.colors.accent + '10',
+									}}
+								>
+									Drop here to ungroup
+								</div>
+							)}
+							<button
+								onClick={createNewGroup}
+								className="w-full px-2 py-1.5 rounded-full text-[10px] font-medium hover:opacity-80 transition-opacity flex items-center justify-center gap-1"
+								style={{
+									backgroundColor: theme.colors.accent + '20',
+									color: theme.colors.accent,
+									border: `1px solid ${theme.colors.accent}40`,
+								}}
+								title="Create new group"
+							>
+								<Plus className="w-3 h-3" />
+								<span>New Group</span>
+							</button>
 						</div>
 					) : null}
 

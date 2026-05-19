@@ -17,7 +17,6 @@ import { notifyCenterFlash } from '../stores/centerFlashStore';
 import { flashCopiedToClipboard } from '../utils/flashCopiedToClipboard';
 import { getAllFolderPaths } from '../utils/fileExplorer';
 import { useModalStore } from '../stores/modalStore';
-import { QUICK_ACTION_PROMPTS } from '../../shared/promptDefinitions';
 import { MODAL_PRIORITIES } from '../constants/modalPriorities';
 import { gitService } from '../services/git';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
@@ -1360,14 +1359,6 @@ export const QuickActionsModal = memo(function QuickActionsModal(props: QuickAct
 				setQuickActionOpen(false);
 			},
 		},
-		...QUICK_ACTION_PROMPTS.map((p) => ({
-			id: `edit-prompt-${p.id}`,
-			label: `Edit Prompt: ${p.label}`,
-			action: () => {
-				useModalStore.getState().openModal('settings', { tab: 'prompts', promptId: p.id });
-				setQuickActionOpen(false);
-			},
-		})),
 		{
 			id: 'shortcuts',
 			label: 'View Shortcuts',

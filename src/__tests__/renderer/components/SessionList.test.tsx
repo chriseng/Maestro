@@ -871,7 +871,7 @@ describe('SessionList', () => {
 			expect(headerRow?.contains(newGroupButton)).toBe(true);
 		});
 
-		it('keeps Ungrouped Agents folder visible (with inline New Group) even when no ungrouped sessions exist', () => {
+		it('hides the Ungrouped Agents header when no ungrouped sessions exist but still shows the New Group button', () => {
 			const createNewGroup = vi.fn();
 			const group = createMockGroup({ id: 'g1', name: 'My Group', sessionIds: ['s1'] });
 			const sessions = [createMockSession({ id: 's1', name: 'Grouped Session', groupId: 'g1' })];
@@ -886,10 +886,11 @@ describe('SessionList', () => {
 			});
 			render(<SessionList {...props} />);
 
-			// Ungrouped Agents header is always shown when groups exist — it doubles
-			// as the drop zone for un-grouping a session.
-			expect(screen.getByText('Ungrouped Agents')).toBeInTheDocument();
-			// The inline New Group button still renders alongside the header.
+			// With every session in a group, the empty "Ungrouped Agents" folder
+			// header is replaced by a compact drop-zone container + New Group
+			// button — no orphan folder header.
+			expect(screen.queryByText('Ungrouped Agents')).not.toBeInTheDocument();
+			// The New Group button still renders so the user can keep organizing.
 			expect(screen.getByText('New Group')).toBeInTheDocument();
 		});
 	});
@@ -1043,7 +1044,7 @@ describe('SessionList', () => {
 			expect(screen.getByText('Ungrouped Session')).toBeInTheDocument();
 		});
 
-		it('keeps Ungrouped Agents folder visible even when all sessions are in groups', () => {
+		it('hides the Ungrouped Agents folder when all sessions are in groups', () => {
 			const group = createMockGroup({ id: 'g1', name: 'My Group', sessionIds: ['s1'] });
 			const sessions = [createMockSession({ id: 's1', name: 'Grouped Session', groupId: 'g1' })];
 			useSessionStore.setState({
@@ -1058,8 +1059,9 @@ describe('SessionList', () => {
 
 			// The session should be visible in the group
 			expect(screen.getByText('Grouped Session')).toBeInTheDocument();
-			// The Ungrouped Agents folder stays visible as a permanent drop target.
-			expect(screen.getByText('Ungrouped Agents')).toBeInTheDocument();
+			// No empty "Ungrouped Agents" header — the drop zone / New Group
+			// button takes over that space instead.
+			expect(screen.queryByText('Ungrouped Agents')).not.toBeInTheDocument();
 		});
 
 		it('selects session when clicked', () => {

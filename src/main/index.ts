@@ -71,6 +71,8 @@ import {
 	registerAttachmentsHandlers,
 	registerWebHandlers,
 	ensureCliServer,
+	startCliDiscoveryWatchdog,
+	stopCliDiscoveryWatchdog,
 	registerLeaderboardHandlers,
 	registerNotificationsHandlers,
 	registerSymphonyHandlers,
@@ -600,6 +602,11 @@ app
 			settingsStore: store,
 		};
 		await ensureCliServer(cliServerDeps);
+		// Defense in depth: if the initial attempt silently dropped the
+		// discovery file (or any later code deletes / clobbers it), the
+		// watchdog republishes within seconds so maestro-cli works without
+		// the user having to toggle Live Mode to coax it back.
+		startCliDiscoveryWatchdog(cliServerDeps);
 
 		// Initialize core prompts from disk (must happen before features that use them)
 		try {
@@ -1156,6 +1163,9 @@ quitHandler = createQuitHandler({
 	closeStatsDB,
 	stopCliWatcher: () => {
 		cliWatcher.stop();
+		// Tear down the discovery-file watchdog so it doesn't try to rewrite
+		// the file after the quit handler has just deleted it.
+		stopCliDiscoveryWatchdog();
 		// Stop Cue engine on app quit
 		if (cueEngine?.isEnabled()) {
 			cueEngine.stop();
