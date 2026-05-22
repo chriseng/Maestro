@@ -469,76 +469,165 @@ function DeleteFileModal({
 
 /**
  * MoveConflictModal — shown when a drag-to-move would clobber an existing file
- * or folder at the destination. Lets the user overwrite, rename with a
- * pre-computed non-conflicting name, or cancel.
+ * or folder at the destination. Handles both single-file conflicts (Rename to X
+ * / Overwrite existing / Cancel) and multi-file batches dropped together
+ * (Auto-rename conflicts / Overwrite all / Skip conflicts / Cancel).
  */
 interface MoveConflictModalProps {
 	theme: Theme;
-	sourceName: string;
 	destFolderLabel: string;
-	autoRenameTo: string;
+	conflicts: PendingMove[];
+	nonConflictingCount: number;
 	isMoving: boolean;
 	onCancel: () => void;
-	onOverwrite: () => void;
-	onAutoRename: () => void;
+	onOverwriteAll: () => void;
+	onAutoRenameAll: () => void;
+	onSkipConflicts: () => void;
 }
 
 function MoveConflictModal({
 	theme,
-	sourceName,
 	destFolderLabel,
-	autoRenameTo,
+	conflicts,
+	nonConflictingCount,
 	isMoving,
 	onCancel,
-	onOverwrite,
-	onAutoRename,
+	onOverwriteAll,
+	onAutoRenameAll,
+	onSkipConflicts,
 }: MoveConflictModalProps) {
 	const cancelButtonRef = useRef<HTMLButtonElement>(null);
+	const isSingle = conflicts.length === 1 && nonConflictingCount === 0;
+	const conflictCount = conflicts.length;
+
+	let title: string;
+	let bodyText: React.ReactNode;
+	let autoRenameLabel: React.ReactNode;
+	let overwriteLabel: React.ReactNode;
+	let autoRenameDescription: string;
+	let overwriteDescription: string;
+
+	if (isSingle) {
+		const only = conflicts[0];
+		title = 'Name conflict';
+		bodyText = (
+			<>
+				"{only.sourceName}" already exists in {destFolderLabel}. How do you want to proceed?
+			</>
+		);
+		autoRenameLabel = <>Rename to "{only.autoRenameName}"</>;
+		overwriteLabel = <>Overwrite existing</>;
+		autoRenameDescription = 'Move the file with an auto-suffixed name so nothing is overwritten.';
+		overwriteDescription = 'Replace the file already at the destination. Cannot be undone.';
+	} else {
+		title = `Name conflicts (${conflictCount})`;
+		bodyText = (
+			<>
+				{conflictCount} item{conflictCount === 1 ? '' : 's'} already exist
+				{conflictCount === 1 ? 's' : ''} in {destFolderLabel}
+				{nonConflictingCount > 0 && (
+					<>
+						{' '}
+						({nonConflictingCount} other{nonConflictingCount === 1 ? '' : 's'} can move without
+						conflict)
+					</>
+				)}
+				. How do you want to proceed?
+			</>
+		);
+		autoRenameLabel = (
+			<>
+				Auto-rename {conflictCount} conflicting item{conflictCount === 1 ? '' : 's'}
+			</>
+		);
+		overwriteLabel = (
+			<>
+				Overwrite all {conflictCount} existing item{conflictCount === 1 ? '' : 's'}
+			</>
+		);
+		autoRenameDescription =
+			'Move conflicting items with auto-suffixed names so nothing is overwritten.';
+		overwriteDescription = 'Replace the existing items at the destination. Cannot be undone.';
+	}
 
 	return (
 		<Modal
 			theme={theme}
-			title="Name conflict"
+			title={title}
 			priority={MODAL_PRIORITIES.CONFIRM}
 			onClose={isMoving ? () => {} : onCancel}
 			headerIcon={<AlertTriangle className="w-4 h-4" style={{ color: theme.colors.warning }} />}
 			initialFocusRef={cancelButtonRef}
 		>
 			<div className="flex flex-col gap-4">
-				<p style={{ color: theme.colors.textMain }}>
-					"{sourceName}" already exists in {destFolderLabel}. How do you want to proceed?
-				</p>
+				<p style={{ color: theme.colors.textMain }}>{bodyText}</p>
+				{!isSingle && conflictCount > 0 && (
+					<div
+						className="text-xs rounded border px-2 py-1.5 max-h-32 overflow-auto"
+						style={{
+							borderColor: theme.colors.border,
+							color: theme.colors.textDim,
+							backgroundColor: theme.colors.bgActivity,
+						}}
+					>
+						{conflicts.map((c) => (
+							<div key={c.sourceRelativePath} className="truncate" title={c.sourceName}>
+								{c.sourceName} → {c.autoRenameName}
+							</div>
+						))}
+					</div>
+				)}
 				<div className="flex flex-col gap-2">
 					<button
 						type="button"
 						disabled={isMoving}
-						onClick={onAutoRename}
+						onClick={onAutoRenameAll}
 						className="px-3 py-2 rounded text-sm text-left disabled:opacity-50 hover:bg-white/5 transition-colors"
 						style={{
 							border: `1px solid ${theme.colors.border}`,
 							color: theme.colors.textMain,
 						}}
 					>
-						<div className="font-medium">Rename to "{autoRenameTo}"</div>
+						<div className="font-medium">{autoRenameLabel}</div>
 						<div className="text-xs mt-0.5" style={{ color: theme.colors.textDim }}>
-							Move the file with an auto-suffixed name so nothing is overwritten.
+							{autoRenameDescription}
 						</div>
 					</button>
 					<button
 						type="button"
 						disabled={isMoving}
-						onClick={onOverwrite}
+						onClick={onOverwriteAll}
 						className="px-3 py-2 rounded text-sm text-left disabled:opacity-50 hover:bg-white/5 transition-colors"
 						style={{
 							border: `1px solid ${theme.colors.border}`,
 							color: theme.colors.error,
 						}}
 					>
-						<div className="font-medium">Overwrite existing</div>
+						<div className="font-medium">{overwriteLabel}</div>
 						<div className="text-xs mt-0.5" style={{ color: theme.colors.textDim }}>
-							Replace the file already at the destination. Cannot be undone.
+							{overwriteDescription}
 						</div>
 					</button>
+					{nonConflictingCount > 0 && (
+						<button
+							type="button"
+							disabled={isMoving}
+							onClick={onSkipConflicts}
+							className="px-3 py-2 rounded text-sm text-left disabled:opacity-50 hover:bg-white/5 transition-colors"
+							style={{
+								border: `1px solid ${theme.colors.border}`,
+								color: theme.colors.textMain,
+							}}
+						>
+							<div className="font-medium">
+								Skip conflicts, move {nonConflictingCount} other
+								{nonConflictingCount === 1 ? '' : 's'}
+							</div>
+							<div className="text-xs mt-0.5" style={{ color: theme.colors.textDim }}>
+								Leave the existing items alone and only move the non-conflicting selection.
+							</div>
+						</button>
+					)}
 					<button
 						ref={cancelButtonRef}
 						type="button"
@@ -574,6 +663,24 @@ interface FlattenedNode {
 	depth: number;
 	globalIndex: number;
 }
+
+/**
+ * One file/folder slated to be moved in a drag-drop batch. Pre-computed during
+ * drop validation so the modal and the executor can share a single plan.
+ */
+interface PendingMove {
+	sourceName: string;
+	sourceRelativePath: string;
+	sourceAbsolutePath: string;
+	destAbsolutePath: string;
+	autoRenameName: string;
+	autoRenameAbsolutePath: string;
+}
+
+/** MIME type for dragging multiple file-tree rows as a JSON array of relative paths. */
+const FILE_TREE_MULTI_MIME = 'application/x-maestro-file-paths';
+/** MIME type for dragging a single file-tree row as a relative path. */
+const FILE_TREE_SINGLE_MIME = 'application/x-maestro-file-path';
 
 /**
  * Above this many files, "Preview all files under Folder" asks for confirmation
@@ -783,20 +890,28 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 
 	// Drag-to-move state. `dragOverFolder` is the relative path of the folder row
 	// currently being hovered (used for highlighting). `moveConflict` is set when
-	// the destination already has a file/folder with the same name and we need
-	// the user to pick overwrite / auto-rename / cancel.
+	// at least one destination already has a file/folder with the same name and
+	// we need the user to pick overwrite / auto-rename / skip / cancel.
 	const [dragOverFolder, setDragOverFolder] = useState<string | null>(null);
 	const [moveConflict, setMoveConflict] = useState<{
-		sourceName: string;
-		sourceRelativePath: string;
-		sourceAbsolutePath: string;
 		destFolderRelativePath: string;
 		destFolderAbsolutePath: string;
-		destAbsolutePath: string;
-		autoRenameName: string;
-		autoRenameAbsolutePath: string;
+		conflicts: PendingMove[];
+		nonConflicting: PendingMove[];
 	} | null>(null);
 	const [isMoving, setIsMoving] = useState(false);
+
+	// Multi-selection state. Holds *explicitly* selected paths (Cmd/Shift+click).
+	// When empty, the row at `selectedFileIndex` is the implicit single selection.
+	// When non-empty, these are the rows highlighted and dragged as a group.
+	const [selectedPaths, setSelectedPaths] = useState<Set<string>>(() => new Set());
+	// Ref mirror so the memoized TreeRow renderer can read the current selection
+	// without listing it as a dep (which would force every row to re-render on
+	// every click).
+	const selectedPathsRef = useRef(selectedPaths);
+	useEffect(() => {
+		selectedPathsRef.current = selectedPaths;
+	}, [selectedPaths]);
 
 	// Close context menu when clicking outside
 	useClickOutside(
@@ -818,6 +933,12 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 
 	useEffect(() => {
 		sessionIdRef.current = session.id;
+	}, [session.id]);
+
+	// Drop the multi-selection when switching agents — paths are session-scoped
+	// and would otherwise resolve against a different working directory.
+	useEffect(() => {
+		setSelectedPaths(new Set());
 	}, [session.id]);
 
 	// Get current auto-refresh interval from session (180s default as defense-in-depth for unmigrated sessions)
@@ -1357,72 +1478,168 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		return baseName;
 	}, []);
 
-	const performMove = useCallback(
+	// Execute a batch of moves, optionally deleting an existing destination first
+	// (used for overwrites). Refreshes the file tree once at the end and reports
+	// aggregate success/failure via the flash banner.
+	const performMoves = useCallback(
 		async (
-			sourceAbsolute: string,
-			destAbsolute: string,
-			sourceName: string,
+			moves: Array<{
+				sourceName: string;
+				sourceAbsolutePath: string;
+				destAbsolutePath: string;
+				/** When true, delete `destAbsolutePath` (recursive) before renaming — overwrite mode. */
+				deleteDestFirst?: boolean;
+			}>,
 			destFolderRelative: string
 		) => {
-			setIsMoving(true);
-			try {
-				await window.maestro.fs.rename(sourceAbsolute, destAbsolute, sshRemoteId);
-				// fs:rename mutates the tree's shape (parent dirs change, expansions
-				// may go stale), so do a full refresh instead of an in-place patch.
-				await refreshFileTree(session.id);
-				// Expand the destination folder so the moved row is visible without
-				// an extra click.
-				expandFolder(destFolderRelative);
-				onShowFlash?.(`Moved "${sourceName}"`);
-			} catch (error) {
-				onShowFlash?.(`Move failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-			} finally {
-				setIsMoving(false);
+			if (moves.length === 0) {
 				setMoveConflict(null);
+				return;
 			}
+			setIsMoving(true);
+			let succeeded = 0;
+			let failed = 0;
+			let lastError: unknown = null;
+			for (const m of moves) {
+				try {
+					if (m.deleteDestFirst) {
+						// May not exist if the user picked overwrite for a phantom conflict;
+						// swallow the error and let the rename surface the real failure.
+						try {
+							await window.maestro.fs.delete(m.destAbsolutePath, {
+								recursive: true,
+								sshRemoteId,
+							});
+						} catch (deleteErr) {
+							logger.warn(
+								`[FileExplorer] Pre-overwrite delete failed for "${m.sourceName}"`,
+								undefined,
+								deleteErr
+							);
+						}
+					}
+					await window.maestro.fs.rename(m.sourceAbsolutePath, m.destAbsolutePath, sshRemoteId);
+					succeeded++;
+				} catch (err) {
+					failed++;
+					lastError = err;
+					logger.warn(`[FileExplorer] Move failed for "${m.sourceName}"`, undefined, err);
+				}
+			}
+			// fs:rename mutates the tree's shape (parent dirs change, expansions
+			// may go stale), so do a full refresh instead of in-place patching for
+			// every move.
+			await refreshFileTree(session.id);
+			expandFolder(destFolderRelative);
+			// Clear multi-selection — the moved paths are stale.
+			setSelectedPaths(new Set());
+
+			if (succeeded > 0 && failed === 0) {
+				if (succeeded === 1) {
+					onShowFlash?.(`Moved "${moves[0].sourceName}"`);
+				} else {
+					onShowFlash?.(`Moved ${succeeded} items`);
+				}
+			} else if (succeeded > 0 && failed > 0) {
+				onShowFlash?.(`Moved ${succeeded}, ${failed} failed`);
+			} else if (failed > 0) {
+				const msg = lastError instanceof Error ? lastError.message : 'Unknown error';
+				onShowFlash?.(`Move failed: ${msg}`);
+			}
+
+			setIsMoving(false);
+			setMoveConflict(null);
 		},
 		[sshRemoteId, refreshFileTree, session.id, onShowFlash, expandFolder]
 	);
 
 	const handleFolderDrop = useCallback(
 		(e: React.DragEvent, destFolderRelative: string) => {
-			const sourceRelative = e.dataTransfer.getData('application/x-maestro-file-path');
-			if (!sourceRelative) return;
+			// Multi-source first, single-source fallback (matches the MIME types we
+			// write in onDragStart — see TreeRow).
+			const multi = e.dataTransfer.getData(FILE_TREE_MULTI_MIME);
+			let sources: string[] = [];
+			if (multi) {
+				try {
+					const parsed = JSON.parse(multi);
+					if (Array.isArray(parsed)) sources = parsed.filter((s) => typeof s === 'string');
+				} catch {
+					// Fall through to single-path branch.
+				}
+			}
+			if (sources.length === 0) {
+				const single = e.dataTransfer.getData(FILE_TREE_SINGLE_MIME);
+				if (single) sources = [single];
+			}
+			if (sources.length === 0) return;
 
 			e.preventDefault();
 			e.stopPropagation();
 			setDragOverFolder(null);
 
-			// Self / descendant / same-parent drops are no-ops. Validation also
-			// happens in handleFolderDragOver, but guard here in case dragOver was
-			// bypassed by a same-element drop.
-			if (isSelfOrDescendant(sourceRelative, destFolderRelative)) return;
-			if (parentDirOf(sourceRelative) === destFolderRelative) return;
-
-			const sourceName = basenameOf(sourceRelative);
-			const sourceAbsolute = `${session.fullPath}/${sourceRelative}`;
 			const destFolderAbsolute = `${session.fullPath}/${destFolderRelative}`;
-			const destRelative = `${destFolderRelative}/${sourceName}`;
-			const destAbsolute = `${destFolderAbsolute}/${sourceName}`;
+			const destFolderNode = findNodeAtPath(destFolderRelative);
+			// Build a growing name set so two auto-renames in the same batch don't
+			// collide (e.g. two "index.ts" files dropped together).
+			const existingNames = new Set(destFolderNode?.children?.map((c) => c.name) ?? []);
+			const noConflict: PendingMove[] = [];
+			const conflicts: PendingMove[] = [];
 
-			const conflictNode = findNodeAtPath(destRelative);
-			if (!conflictNode) {
-				void performMove(sourceAbsolute, destAbsolute, sourceName, destFolderRelative);
+			for (const sourceRelative of sources) {
+				// Self / descendant / same-parent drops are no-ops. Validation also
+				// happens in handleFolderDragOver, but guard here in case dragOver was
+				// bypassed by a same-element drop.
+				if (isSelfOrDescendant(sourceRelative, destFolderRelative)) continue;
+				if (parentDirOf(sourceRelative) === destFolderRelative) continue;
+
+				const sourceName = basenameOf(sourceRelative);
+				const sourceAbsolute = `${session.fullPath}/${sourceRelative}`;
+				const destRelative = `${destFolderRelative}/${sourceName}`;
+				const destAbsolute = `${destFolderAbsolute}/${sourceName}`;
+				const conflictNode = findNodeAtPath(destRelative);
+				if (conflictNode) {
+					const autoRenameName = computeAutoRenameName(existingNames, sourceName);
+					existingNames.add(autoRenameName);
+					conflicts.push({
+						sourceName,
+						sourceRelativePath: sourceRelative,
+						sourceAbsolutePath: sourceAbsolute,
+						destAbsolutePath: destAbsolute,
+						autoRenameName,
+						autoRenameAbsolutePath: `${destFolderAbsolute}/${autoRenameName}`,
+					});
+				} else {
+					existingNames.add(sourceName);
+					noConflict.push({
+						sourceName,
+						sourceRelativePath: sourceRelative,
+						sourceAbsolutePath: sourceAbsolute,
+						destAbsolutePath: destAbsolute,
+						autoRenameName: sourceName,
+						autoRenameAbsolutePath: destAbsolute,
+					});
+				}
+			}
+
+			if (noConflict.length === 0 && conflicts.length === 0) return;
+
+			if (conflicts.length === 0) {
+				void performMoves(
+					noConflict.map((m) => ({
+						sourceName: m.sourceName,
+						sourceAbsolutePath: m.sourceAbsolutePath,
+						destAbsolutePath: m.destAbsolutePath,
+					})),
+					destFolderRelative
+				);
 				return;
 			}
 
-			const destFolderNode = findNodeAtPath(destFolderRelative);
-			const existingNames = new Set(destFolderNode?.children?.map((c) => c.name) ?? []);
-			const autoRenameName = computeAutoRenameName(existingNames, sourceName);
 			setMoveConflict({
-				sourceName,
-				sourceRelativePath: sourceRelative,
-				sourceAbsolutePath: sourceAbsolute,
 				destFolderRelativePath: destFolderRelative,
 				destFolderAbsolutePath: destFolderAbsolute,
-				destAbsolutePath: destAbsolute,
-				autoRenameName,
-				autoRenameAbsolutePath: `${destFolderAbsolute}/${autoRenameName}`,
+				conflicts,
+				nonConflicting: noConflict,
 			});
 		},
 		[
@@ -1432,23 +1649,30 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 			basenameOf,
 			findNodeAtPath,
 			computeAutoRenameName,
-			performMove,
+			performMoves,
 		]
 	);
 
 	const handleFolderDragOver = useCallback(
 		(e: React.DragEvent, destFolderRelative: string) => {
-			if (!e.dataTransfer.types.includes('application/x-maestro-file-path')) return;
+			// Accept either single- or multi-source maestro drags.
+			const hasMaestroDrag =
+				e.dataTransfer.types.includes(FILE_TREE_SINGLE_MIME) ||
+				e.dataTransfer.types.includes(FILE_TREE_MULTI_MIME);
+			if (!hasMaestroDrag) return;
 			// During dragOver, getData() returns '' in some browsers as a security
 			// measure — we can still consult the type list to know it's our drag.
 			// If we can read the path, validate it; otherwise optimistically accept
-			// and re-validate on drop.
-			const sourceRelative = e.dataTransfer.getData('application/x-maestro-file-path');
-			if (sourceRelative && isSelfOrDescendant(sourceRelative, destFolderRelative)) {
+			// and re-validate on drop. For multi-source drags we always optimistically
+			// accept (we'd need to JSON.parse to validate, and it'd still need per-item
+			// checks at drop time anyway).
+			const sourceRelative = e.dataTransfer.getData(FILE_TREE_SINGLE_MIME);
+			const isMulti = e.dataTransfer.types.includes(FILE_TREE_MULTI_MIME);
+			if (!isMulti && sourceRelative && isSelfOrDescendant(sourceRelative, destFolderRelative)) {
 				e.dataTransfer.dropEffect = 'none';
 				return;
 			}
-			if (sourceRelative && parentDirOf(sourceRelative) === destFolderRelative) {
+			if (!isMulti && sourceRelative && parentDirOf(sourceRelative) === destFolderRelative) {
 				e.dataTransfer.dropEffect = 'none';
 				return;
 			}
@@ -1460,13 +1684,19 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 	);
 
 	const handleFolderDragEnter = useCallback((e: React.DragEvent, destFolderRelative: string) => {
-		if (!e.dataTransfer.types.includes('application/x-maestro-file-path')) return;
+		const hasMaestroDrag =
+			e.dataTransfer.types.includes(FILE_TREE_SINGLE_MIME) ||
+			e.dataTransfer.types.includes(FILE_TREE_MULTI_MIME);
+		if (!hasMaestroDrag) return;
 		e.stopPropagation();
 		setDragOverFolder(destFolderRelative);
 	}, []);
 
 	const handleFolderDragLeave = useCallback((e: React.DragEvent) => {
-		if (!e.dataTransfer.types.includes('application/x-maestro-file-path')) return;
+		const hasMaestroDrag =
+			e.dataTransfer.types.includes(FILE_TREE_SINGLE_MIME) ||
+			e.dataTransfer.types.includes(FILE_TREE_MULTI_MIME);
+		if (!hasMaestroDrag) return;
 		e.stopPropagation();
 		// Keep the highlight when moving into a descendant of the row (label,
 		// icon, indent guides). Clear when leaving the row outline entirely.
@@ -1476,42 +1706,53 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		setDragOverFolder(null);
 	}, []);
 
-	// Confirm-overwrite handler for the conflict modal: deletes the existing
-	// target first (works for both files and dirs, where a plain rename onto a
-	// non-empty dir would fail with ENOTEMPTY), then performs the move.
-	const handleMoveOverwrite = useCallback(async () => {
+	// Conflict-modal action handlers. They build the appropriate batch of moves
+	// (conflicts + non-conflicting, with the chosen resolution) and hand it to
+	// performMoves.
+	const handleMoveOverwriteAll = useCallback(() => {
 		if (!moveConflict) return;
-		setIsMoving(true);
-		try {
-			await window.maestro.fs.delete(moveConflict.destAbsolutePath, {
-				recursive: true,
-				sshRemoteId,
-			});
-			await window.maestro.fs.rename(
-				moveConflict.sourceAbsolutePath,
-				moveConflict.destAbsolutePath,
-				sshRemoteId
-			);
-			await refreshFileTree(session.id);
-			expandFolder(moveConflict.destFolderRelativePath);
-			onShowFlash?.(`Moved "${moveConflict.sourceName}" (overwrote existing)`);
-		} catch (error) {
-			onShowFlash?.(`Move failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-		} finally {
-			setIsMoving(false);
-			setMoveConflict(null);
-		}
-	}, [moveConflict, sshRemoteId, refreshFileTree, session.id, onShowFlash, expandFolder]);
+		const batch = [
+			...moveConflict.nonConflicting.map((m) => ({
+				sourceName: m.sourceName,
+				sourceAbsolutePath: m.sourceAbsolutePath,
+				destAbsolutePath: m.destAbsolutePath,
+			})),
+			...moveConflict.conflicts.map((m) => ({
+				sourceName: m.sourceName,
+				sourceAbsolutePath: m.sourceAbsolutePath,
+				destAbsolutePath: m.destAbsolutePath,
+				deleteDestFirst: true,
+			})),
+		];
+		void performMoves(batch, moveConflict.destFolderRelativePath);
+	}, [moveConflict, performMoves]);
 
-	const handleMoveAutoRename = useCallback(() => {
+	const handleMoveAutoRenameAll = useCallback(() => {
 		if (!moveConflict) return;
-		void performMove(
-			moveConflict.sourceAbsolutePath,
-			moveConflict.autoRenameAbsolutePath,
-			moveConflict.autoRenameName,
-			moveConflict.destFolderRelativePath
-		);
-	}, [moveConflict, performMove]);
+		const batch = [
+			...moveConflict.nonConflicting.map((m) => ({
+				sourceName: m.sourceName,
+				sourceAbsolutePath: m.sourceAbsolutePath,
+				destAbsolutePath: m.destAbsolutePath,
+			})),
+			...moveConflict.conflicts.map((m) => ({
+				sourceName: m.autoRenameName,
+				sourceAbsolutePath: m.sourceAbsolutePath,
+				destAbsolutePath: m.autoRenameAbsolutePath,
+			})),
+		];
+		void performMoves(batch, moveConflict.destFolderRelativePath);
+	}, [moveConflict, performMoves]);
+
+	const handleMoveSkipConflicts = useCallback(() => {
+		if (!moveConflict) return;
+		const batch = moveConflict.nonConflicting.map((m) => ({
+			sourceName: m.sourceName,
+			sourceAbsolutePath: m.sourceAbsolutePath,
+			destAbsolutePath: m.destAbsolutePath,
+		}));
+		void performMoves(batch, moveConflict.destFolderRelativePath);
+	}, [moveConflict, performMoves]);
 
 	// Close context menu on Escape key (only attached while the menu is open).
 	useEventListener(
@@ -1662,6 +1903,58 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		return result;
 	}, [displayTree, session.fileExplorerExpanded, fileTreeFilter]);
 
+	// Ref mirror so the memoized row click handler can compute shift-click ranges
+	// against the latest tree shape without listing flattenedTree as a dep.
+	const flattenedTreeRef = useRef(flattenedTree);
+	useEffect(() => {
+		flattenedTreeRef.current = flattenedTree;
+	}, [flattenedTree]);
+
+	// Multi-select aware row click. Plain click = single select (clear extras).
+	// Cmd/Ctrl+click = toggle this row in the multi-selection. Shift+click =
+	// extend selection from selectedFileIndex (anchor) to this row.
+	const handleRowSelectionClick = useCallback(
+		(e: React.MouseEvent, globalIndex: number, fullPath: string) => {
+			if (e.shiftKey) {
+				// Finder/Explorer semantics: the anchor (selectedFileIndex) stays put
+				// across successive shift-clicks so the range pivots from the last
+				// plain/Cmd-click rather than the last shift-click. Plain click,
+				// Cmd-click, and arrow-key navigation all move the anchor; shift-click
+				// does not. Applied uniformly across Windows, Linux, and macOS.
+				const anchor = selectedFileIndex;
+				const tree = flattenedTreeRef.current;
+				const start = Math.min(anchor, globalIndex);
+				const end = Math.max(anchor, globalIndex);
+				const next = new Set<string>();
+				for (let i = start; i <= end; i++) {
+					const item = tree[i];
+					if (item) next.add(item.path);
+				}
+				setSelectedPaths(next);
+				return;
+			}
+			if (e.metaKey || e.ctrlKey) {
+				const current = selectedPathsRef.current;
+				const next = new Set(current);
+				// If the selection was empty, fold in the previously-selected single
+				// row so toggling adds (or removes) relative to a 1-item baseline.
+				if (next.size === 0) {
+					const prevItem = flattenedTreeRef.current[selectedFileIndex];
+					if (prevItem && prevItem.path !== fullPath) next.add(prevItem.path);
+				}
+				if (next.has(fullPath)) next.delete(fullPath);
+				else next.add(fullPath);
+				setSelectedPaths(next);
+				setSelectedFileIndex(globalIndex);
+				return;
+			}
+			// Plain click — collapse to single selection.
+			if (selectedPathsRef.current.size > 0) setSelectedPaths(new Set());
+			setSelectedFileIndex(globalIndex);
+		},
+		[selectedFileIndex, setSelectedFileIndex]
+	);
+
 	// Virtualization setup
 	const parentRef = useRef<HTMLDivElement>(null);
 	const ROW_HEIGHT = 28; // Height of each tree row in pixels
@@ -1732,6 +2025,7 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 			const isSelected = activeFileTabPath === absolutePath;
 			const isKeyboardSelected =
 				activeFocus === 'right' && activeRightTab === 'files' && globalIndex === selectedFileIndex;
+			const isMultiSelected = selectedPaths.has(fullPath);
 
 			// Generate indent guides for each depth level
 			const indentGuides = [];
@@ -1765,20 +2059,39 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 							? theme.colors.accent
 							: isKeyboardSelected
 								? theme.colors.accent
-								: 'transparent',
+								: isMultiSelected
+									? theme.colors.accent
+									: 'transparent',
 						backgroundColor: isDropTarget
 							? `${theme.colors.accent}33`
-							: isKeyboardSelected
-								? theme.colors.bgActivity
-								: isSelected
-									? 'rgba(255,255,255,0.1)'
-									: undefined,
+							: isMultiSelected
+								? `${theme.colors.accent}22`
+								: isKeyboardSelected
+									? theme.colors.bgActivity
+									: isSelected
+										? 'rgba(255,255,255,0.1)'
+										: undefined,
 						outline: isDropTarget ? `1px dashed ${theme.colors.accent}` : undefined,
 						outlineOffset: isDropTarget ? '-2px' : undefined,
 					}}
 					draggable
 					onDragStart={(e) => {
-						e.dataTransfer.setData('application/x-maestro-file-path', fullPath);
+						// If this row is part of an active multi-selection, drag the whole
+						// group; otherwise drag just this row (and collapse selection so
+						// it visually matches what's being dragged).
+						const currentSelection = selectedPathsRef.current;
+						const isPartOfMultiSelection =
+							currentSelection.size > 1 && currentSelection.has(fullPath);
+						if (isPartOfMultiSelection) {
+							const paths = Array.from(currentSelection);
+							// Single-path MIME stays populated for the receivers (AI input,
+							// existing drop handlers) that don't yet understand the multi MIME.
+							e.dataTransfer.setData(FILE_TREE_SINGLE_MIME, fullPath);
+							e.dataTransfer.setData(FILE_TREE_MULTI_MIME, JSON.stringify(paths));
+						} else {
+							if (currentSelection.size > 0) setSelectedPaths(new Set());
+							e.dataTransfer.setData(FILE_TREE_SINGLE_MIME, fullPath);
+						}
 						// 'copyMove' so folder-row drop targets can choose 'move' (in-tree
 						// reorganisation) while drops on the AI input still default to copy
 						// (insert @mention without moving the source file).
@@ -1795,7 +2108,6 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 						}
 					}}
 					onClick={(e) => {
-						setSelectedFileIndex(globalIndex);
 						if (fileTreeFilter.length > 0) {
 							lastClickedUnderFilterRef.current = fullPath;
 						}
@@ -1803,6 +2115,16 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 						if (fileTreeFilter.length === 0) {
 							setActiveFocus('right');
 						}
+						const isSelectionModifier = e.shiftKey || e.metaKey || e.ctrlKey;
+						// Route through multi-select logic for any modifier click (incl.
+						// folders — selecting a folder shouldn't also toggle its expand).
+						if (isSelectionModifier) {
+							handleRowSelectionClick(e, globalIndex, fullPath);
+							return;
+						}
+						// Plain click: collapse multi-selection back to single, and run
+						// the folder expand/recursive behavior.
+						handleRowSelectionClick(e, globalIndex, fullPath);
 						if (isFolder) {
 							if (e.altKey) {
 								toggleFolderRecursive(fullPath, session.id, setSessions);
@@ -1885,13 +2207,14 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 			activeFocus,
 			activeRightTab,
 			selectedFileIndex,
+			selectedPaths,
 			theme,
 			toggleFolder,
 			toggleFolderRecursive,
 			setSessions,
-			setSelectedFileIndex,
 			setActiveFocus,
 			handleFileClick,
+			handleRowSelectionClick,
 			fileTreeFilter,
 			fileExplorerIconTheme,
 			colorBlindMode,
@@ -1914,7 +2237,10 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 	// External (OS) file drags still bubble normally so the overlay shows when
 	// the cursor is over the file panel during a Finder/Explorer drag.
 	const handleInternalDragBubble = (e: React.DragEvent) => {
-		if (e.dataTransfer.types.includes('application/x-maestro-file-path')) {
+		if (
+			e.dataTransfer.types.includes(FILE_TREE_SINGLE_MIME) ||
+			e.dataTransfer.types.includes(FILE_TREE_MULTI_MIME)
+		) {
 			e.stopPropagation();
 		}
 	};
@@ -2572,17 +2898,18 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 			{moveConflict && (
 				<MoveConflictModal
 					theme={theme}
-					sourceName={moveConflict.sourceName}
 					destFolderLabel={
 						moveConflict.destFolderRelativePath
 							? `"${moveConflict.destFolderRelativePath}"`
 							: 'the project root'
 					}
-					autoRenameTo={moveConflict.autoRenameName}
+					conflicts={moveConflict.conflicts}
+					nonConflictingCount={moveConflict.nonConflicting.length}
 					isMoving={isMoving}
 					onCancel={() => setMoveConflict(null)}
-					onOverwrite={handleMoveOverwrite}
-					onAutoRename={handleMoveAutoRename}
+					onOverwriteAll={handleMoveOverwriteAll}
+					onAutoRenameAll={handleMoveAutoRenameAll}
+					onSkipConflicts={handleMoveSkipConflicts}
 				/>
 			)}
 		</div>

@@ -59,16 +59,26 @@ describe('AutoRunToolbar', () => {
 			expect(screen.queryByText('Run')).toBeNull();
 		});
 
-		it('is disabled when isAgentBusy', () => {
-			render(<AutoRunToolbar {...createDefaultProps({ isAgentBusy: true })} />);
-			const runBtn = screen.getByTitle('Cannot run while agent is thinking');
-			expect(runBtn.hasAttribute('disabled')).toBe(true);
+		it('stays clickable when isAgentBusy so user can still configure auto-run', () => {
+			const onOpenBatchRunner = vi.fn();
+			render(<AutoRunToolbar {...createDefaultProps({ isAgentBusy: true, onOpenBatchRunner })} />);
+			const runBtn = screen.getByRole('button', { name: /Run/ });
+			expect(runBtn.hasAttribute('disabled')).toBe(false);
+			fireEvent.click(runBtn);
+			expect(onOpenBatchRunner).toHaveBeenCalledTimes(1);
 		});
 
-		it('is enabled when agent is not busy', () => {
+		it('shows an "Agent thinking" badge over the Run button when isAgentBusy', () => {
+			render(<AutoRunToolbar {...createDefaultProps({ isAgentBusy: true })} />);
+			expect(screen.getByText('Agent thinking')).toBeDefined();
+			// Tooltip explains that configuration is allowed but launch is paused.
+			expect(screen.getByTitle(/Agent is thinking/)).toBeDefined();
+		});
+
+		it('does not show the "Agent thinking" badge when agent is not busy', () => {
 			render(<AutoRunToolbar {...createDefaultProps({ isAgentBusy: false })} />);
-			const runBtn = screen.getByTitle('Run auto-run on tasks');
-			expect(runBtn.hasAttribute('disabled')).toBe(false);
+			expect(screen.queryByText('Agent thinking')).toBeNull();
+			expect(screen.getByTitle('Run auto-run on tasks')).toBeDefined();
 		});
 
 		it('saves before running if dirty and opens runner only after save resolves', async () => {

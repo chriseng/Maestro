@@ -373,6 +373,9 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 	const hasValidPrompt = validateAgentPromptHasTaskReference(prompt);
 	const isPromptEmpty = !prompt || !prompt.trim();
 
+	// Block launch (but not configuration) while the agent for this session is mid-thought.
+	const isAgentBusy = activeSession?.state === 'busy' || activeSession?.state === 'connecting';
+
 	useModalLayer(MODAL_PRIORITIES.BATCH_RUNNER, undefined, () => {
 		if (showDeleteConfirmModal) {
 			handleCancelDeletePlaybook();
@@ -909,7 +912,8 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 								documents.length === 0 ||
 								documents.length === missingDocCount ||
 								isPromptEmpty ||
-								!hasValidPrompt
+								!hasValidPrompt ||
+								isAgentBusy
 							}
 							className="flex items-center gap-2 px-4 py-2 rounded text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed"
 							style={{
@@ -919,24 +923,27 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 									documents.length === 0 ||
 									documents.length === missingDocCount ||
 									isPromptEmpty ||
-									!hasValidPrompt
+									!hasValidPrompt ||
+									isAgentBusy
 										? theme.colors.textDim
 										: theme.colors.accent,
 							}}
 							title={
 								isPreparingWorktree
 									? 'Preparing worktree...'
-									: isPromptEmpty
-										? 'Agent prompt cannot be empty'
-										: !hasValidPrompt
-											? 'Agent prompt must reference Markdown tasks (e.g., checkbox syntax "- [ ]")'
-											: documents.length === 0
-												? 'No documents selected'
-												: documents.length === missingDocCount
-													? 'All selected documents are missing'
-													: hasNoTasks
-														? 'No unchecked tasks in documents'
-														: 'Start auto-run'
+									: isAgentBusy
+										? 'Agent is thinking — finish or interrupt the current task before launching auto-run'
+										: isPromptEmpty
+											? 'Agent prompt cannot be empty'
+											: !hasValidPrompt
+												? 'Agent prompt must reference Markdown tasks (e.g., checkbox syntax "- [ ]")'
+												: documents.length === 0
+													? 'No documents selected'
+													: documents.length === missingDocCount
+														? 'All selected documents are missing'
+														: hasNoTasks
+															? 'No unchecked tasks in documents'
+															: 'Start auto-run'
 							}
 						>
 							{isPreparingWorktree ? <Spinner size={16} /> : <Play className="w-4 h-4" />}

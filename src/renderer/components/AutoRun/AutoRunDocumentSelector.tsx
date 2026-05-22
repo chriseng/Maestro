@@ -259,16 +259,33 @@ export const AutoRunDocumentSelector = forwardRef<
 		: normalizedNewName;
 	const isDuplicate = !!fullNewPath && documents.some((doc) => doc.toLowerCase() === fullNewPath);
 
-	// Get percentage display for a document's task completion
-	const getTaskPercentage = (docPath: string): number | null => {
+	// Get percentage and total task count for a document
+	const getTaskStats = (docPath: string): { pct: number; total: number } | null => {
 		if (!documentTaskCounts) return null;
 		const counts = documentTaskCounts.get(docPath);
 		if (!counts || counts.total === 0) return null;
-		return Math.round((counts.completed / counts.total) * 100);
+		return {
+			pct: Math.round((counts.completed / counts.total) * 100),
+			total: counts.total,
+		};
 	};
 
-	// Get the selected document's task percentage for the button
-	const selectedTaskPercentage = selectedDocument ? getTaskPercentage(selectedDocument) : null;
+	// Get the selected document's task stats for the button
+	const selectedTaskStats = selectedDocument ? getTaskStats(selectedDocument) : null;
+
+	// Pill badge showing "{pct}% ({total})" — rendered next to file entries and
+	// inside the trigger button. Green when 100% complete, dim accent otherwise.
+	const renderTaskBadge = (stats: { pct: number; total: number }, extraClass = '') => (
+		<span
+			className={`shrink-0 text-xs px-1.5 py-0.5 rounded ${extraClass}`.trim()}
+			style={{
+				backgroundColor: stats.pct === 100 ? theme.colors.success : theme.colors.accentDim,
+				color: stats.pct === 100 ? '#000' : theme.colors.textDim,
+			}}
+		>
+			{stats.pct}% ({stats.total})
+		</span>
+	);
 
 	// Render a tree node recursively. File nodes participate in arrow-key
 	// highlight via `highlightedPath`; folder nodes toggle their own expansion
@@ -304,7 +321,7 @@ export const AutoRunDocumentSelector = forwardRef<
 		// File node
 		const isSelected = node.path === selectedDocument;
 		const isHighlighted = node.path === highlightedPath;
-		const taskPct = getTaskPercentage(node.path);
+		const taskStats = getTaskStats(node.path);
 		return (
 			<button
 				key={node.path}
@@ -335,17 +352,7 @@ export const AutoRunDocumentSelector = forwardRef<
 					{getExplorerFileIcon(`${node.name}.md`, theme)}
 				</span>
 				<span className="truncate">{node.name}.md</span>
-				{taskPct !== null && (
-					<span
-						className="shrink-0 text-xs ml-auto px-1.5 py-0.5 rounded"
-						style={{
-							backgroundColor: taskPct === 100 ? theme.colors.success : theme.colors.accentDim,
-							color: taskPct === 100 ? '#000' : theme.colors.textDim,
-						}}
-					>
-						{taskPct}%
-					</span>
-				)}
+				{taskStats && renderTaskBadge(taskStats, 'ml-auto')}
 			</button>
 		);
 	};
@@ -453,20 +460,7 @@ export const AutoRunDocumentSelector = forwardRef<
 						}}
 					>
 						<span className="truncate min-w-0 flex-1 flex items-center gap-2">
-							{selectedTaskPercentage !== null && (
-								<span
-									className="shrink-0 text-xs px-1.5 py-0.5 rounded"
-									style={{
-										backgroundColor:
-											selectedTaskPercentage === 100
-												? theme.colors.success
-												: theme.colors.accentDim,
-										color: selectedTaskPercentage === 100 ? '#000' : theme.colors.textDim,
-									}}
-								>
-									{selectedTaskPercentage}%
-								</span>
-							)}
+							{selectedTaskStats && renderTaskBadge(selectedTaskStats)}
 							<span className="truncate">
 								{selectedDocument ? `${selectedDocument}.md` : 'Select a document...'}
 							</span>
@@ -554,7 +548,7 @@ export const AutoRunDocumentSelector = forwardRef<
 								) : (
 									// Flat fallback (no documentTree provided) — still keyboard-navigable.
 									visibleFiles.map((doc) => {
-										const taskPct = getTaskPercentage(doc);
+										const taskStats = getTaskStats(doc);
 										const isDocSelected = doc === selectedDocument;
 										const isHighlighted = doc === highlightedPath;
 										return (
@@ -584,18 +578,7 @@ export const AutoRunDocumentSelector = forwardRef<
 													{getExplorerFileIcon(`${doc}.md`, theme)}
 												</span>
 												<span className="truncate">{doc}.md</span>
-												{taskPct !== null && (
-													<span
-														className="shrink-0 text-xs ml-auto px-1.5 py-0.5 rounded"
-														style={{
-															backgroundColor:
-																taskPct === 100 ? theme.colors.success : theme.colors.accentDim,
-															color: taskPct === 100 ? '#000' : theme.colors.textDim,
-														}}
-													>
-														{taskPct}%
-													</span>
-												)}
+												{taskStats && renderTaskBadge(taskStats, 'ml-auto')}
 											</button>
 										);
 									})

@@ -7,6 +7,8 @@ import { validateNewSession } from '../../utils/sessionValidation';
 import { FormInput } from '../ui/FormInput';
 import { Modal, ModalFooter } from '../ui/Modal';
 import { SshRemoteSelector } from '../shared/SshRemoteSelector';
+import { ThemedSelect } from '../shared/ThemedSelect';
+import { useSessionStore } from '../../stores/sessionStore';
 import { formatShortcutKeys } from '../../utils/shortcutFormatter';
 import type { AgentDebugInfo, NewInstanceModalProps } from './types';
 import { SUPPORTED_AGENTS, NEW_SESSION_MESSAGE_MAX_LENGTH } from './types';
@@ -59,6 +61,11 @@ export function NewInstanceModal({
 	>({});
 	// SSH connection error state - shown when we can't connect to the selected remote
 	const [sshConnectionError, setSshConnectionError] = useState<string | null>(null);
+
+	// Group placement: '' means "No Group (Root)". Initialized when the modal
+	// opens from the source session (when duplicating) or the caller's preset.
+	const [selectedGroupId, setSelectedGroupId] = useState<string>('');
+	const groups = useSessionStore((s) => s.groups);
 
 	const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -428,11 +435,11 @@ export function NewInstanceModal({
 						shareHistoryToProjectDir: sshRemoteConfig?.shareHistoryToProjectDir,
 					};
 
-		// Inherit the source session's group when duplicating so the copy lands
-		// alongside the original (issue #827). When not duplicating, honor an
-		// explicit presetGroupId from the caller (e.g. "New Agent in Group"
-		// from the group context menu).
-		const targetGroupId = sourceSession?.groupId ?? presetGroupId ?? undefined;
+		// The dropdown's selected value wins — it was seeded from the source
+		// session's group (when duplicating) or the caller's preset (e.g. "New
+		// Agent in Group" from the group context menu), so explicit user
+		// selection naturally overrides those defaults.
+		const targetGroupId = selectedGroupId || undefined;
 
 		const agentEnableMaestroP = enableMaestroPByAgent[selectedAgent] || undefined;
 		const agentMaestroPPath =
@@ -494,8 +501,7 @@ export function NewInstanceModal({
 		expandTilde,
 		handleWorkingDirChange,
 		existingSessions,
-		sourceSession?.groupId,
-		presetGroupId,
+		selectedGroupId,
 	]);
 
 	// Check if form is valid for submission
@@ -577,8 +583,11 @@ export function NewInstanceModal({
 			}
 			// Reset warning acknowledgment when modal opens
 			setDirectoryWarningAcknowledged(false);
+			// Seed group selection: duplicate inherits source's group; otherwise
+			// honor any presetGroupId from the caller.
+			setSelectedGroupId(sourceSession?.groupId ?? presetGroupId ?? '');
 		}
-	}, [isOpen, sourceSession?.id]);
+	}, [isOpen, sourceSession?.id, presetGroupId]);
 
 	// Load SSH remote configurations independently of agent detection
 	// This ensures SSH remotes are available even if agent detection fails
@@ -685,6 +694,33 @@ export function NewInstanceModal({
 					error={validation.errorField === 'name' ? validation.error : undefined}
 					heightClass="p-2"
 				/>
+
+				{/* Agent Group - only shown when at least one group exists */}
+				{groups.length > 0 && (
+					<div className="w-full">
+						<label
+							htmlFor="agent-group-select"
+							className="block text-xs font-bold opacity-70 uppercase mb-2"
+							style={{ color: theme.colors.textMain }}
+						>
+							Agent Group
+						</label>
+						<ThemedSelect
+							id="agent-group-select"
+							theme={theme}
+							value={selectedGroupId}
+							onChange={setSelectedGroupId}
+							aria-label="Agent Group"
+							options={[
+								{ value: '', label: 'No Group (Root)' },
+								...groups.map((g) => ({
+									value: g.id,
+									label: `${g.emoji} ${g.name}`.trim(),
+								})),
+							]}
+						/>
+					</div>
+				)}
 
 				{/* Agent Selection */}
 				<AgentPickerGrid

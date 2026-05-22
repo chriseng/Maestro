@@ -88,6 +88,28 @@ const renderWithProvider = (ui: React.ReactElement) => {
 	return render(<LayerStackProvider>{ui}</LayerStackProvider>);
 };
 
+// jsdom in this vitest setup does not provide a working localStorage, so install
+// a minimal in-memory implementation for tests that exercise persisted preferences.
+const createMockLocalStorage = (): Storage => {
+	const store = new Map<string, string>();
+	return {
+		getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+		setItem: (key: string, value: string) => {
+			store.set(key, String(value));
+		},
+		removeItem: (key: string) => {
+			store.delete(key);
+		},
+		clear: () => {
+			store.clear();
+		},
+		key: (index: number) => Array.from(store.keys())[index] ?? null,
+		get length() {
+			return store.size;
+		},
+	} as Storage;
+};
+
 describe('PromptComposerModal', () => {
 	let onClose: ReturnType<typeof vi.fn>;
 	let onSubmit: ReturnType<typeof vi.fn>;
@@ -98,6 +120,11 @@ describe('PromptComposerModal', () => {
 		onSubmit = vi.fn();
 		onSend = vi.fn();
 		mockGetSuggestions.mockReturnValue([]);
+		Object.defineProperty(window, 'localStorage', {
+			value: createMockLocalStorage(),
+			configurable: true,
+			writable: true,
+		});
 	});
 
 	afterEach(() => {
