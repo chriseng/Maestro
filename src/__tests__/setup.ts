@@ -338,7 +338,11 @@ const mockMaestro = {
 		}),
 		getMaestroPDetectedPath: vi.fn().mockResolvedValue(null),
 		getClaudeUsageSnapshots: vi.fn().mockResolvedValue({}),
+		getClaudeUsageAccountKeys: vi.fn().mockResolvedValue([]),
+		getCodexUsageSnapshots: vi.fn().mockResolvedValue({}),
+		getCodexUsageAccountKeys: vi.fn().mockResolvedValue([]),
 		refreshClaudeUsageSnapshots: vi.fn().mockResolvedValue({ refreshed: 0 }),
+		refreshCodexUsageSnapshots: vi.fn().mockResolvedValue({ refreshed: 0 }),
 	},
 	fonts: {
 		detect: vi.fn().mockResolvedValue([]),

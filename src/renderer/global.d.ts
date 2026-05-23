@@ -1044,13 +1044,34 @@ interface MaestroAPI {
 				{
 					sampledAt: string;
 					configDirKey: string;
+					authState?: 'authenticated' | 'unauthenticated';
 					session: { percent: number; resetsAt: string };
 					weekAllModels: { percent: number; resetsAt: string };
 					weekSonnetOnly: { percent: number; resetsAt: string };
 				}
 			>
 		>;
+		getClaudeUsageAccountKeys: () => Promise<string[]>;
+		getCodexUsageSnapshots: () => Promise<
+			Record<
+				string,
+				{
+					sampledAt: string;
+					codexHomeKey: string;
+					authState: 'authenticated' | 'missing_auth' | 'unauthenticated' | 'error';
+					label?: string;
+					email?: string;
+					planType?: string;
+					session?: { percent: number; resetsAt: string };
+					weekly?: { percent: number; resetsAt: string };
+					additionalLimits?: Array<{ name: string; percent: number; resetsAt?: string }>;
+					error?: string;
+				}
+			>
+		>;
+		getCodexUsageAccountKeys: () => Promise<string[]>;
 		refreshClaudeUsageSnapshots: () => Promise<{ refreshed: number }>;
+		refreshCodexUsageSnapshots: () => Promise<{ refreshed: number }>;
 	};
 	// Agent Sessions API - all methods accept optional sshRemoteId for SSH remote session storage access
 	agentSessions: {

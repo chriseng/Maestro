@@ -10,7 +10,7 @@
  * lazily when an `auto`-mode tab actually needs the data.
  *
  * Why "per CLAUDE_CONFIG_DIR account":
- *   The Max-plan quota is bucketed per Anthropic account, and Maestro users
+ *   The Claude plan quota is bucketed per Anthropic account, and Maestro users
  *   commonly switch accounts via `CLAUDE_CONFIG_DIR=/Users/foo/.claude-gmail`
  *   vs `.claude-smash`. Each canonical path is its own snapshot key. We
  *   resolve the effective env per session (agent-level customEnvVars merged
@@ -35,7 +35,8 @@
  *     `extraResources` in `package.json` for mac/win/linux).
  */
 
-import fs from 'fs';
+import * as fs from 'fs';
+import os from 'os';
 import path from 'path';
 import Store from 'electron-store';
 
@@ -87,6 +88,49 @@ interface SamplingTarget {
 	configDirKey: string;
 	cwd: string;
 	customEnvVars: Record<string, string>;
+}
+
+const ACCOUNT_DIR_EXCLUDE_RE =
+	/(^|[-_.])(backup|bak|old|archive|archived|stage|local|server)([-_.]|$)/i;
+
+function isLikelyClaudeAccountDirName(name: string): boolean {
+	return name === '.claude' || name.startsWith('.claude-');
+}
+
+/**
+ * Discover local Claude Code account directories, mirroring the common
+ * `/token-cockpit` setup where each account lives in a separate
+ * `~/.claude-*` directory. Backups and local/server scratch dirs are skipped
+ * so the dashboard lists active accounts, not migration leftovers.
+ */
+export function discoverClaudeConfigDirs(homeDir = os.homedir()): string[] {
+	let entries: fs.Dirent[];
+	try {
+		entries = fs.readdirSync(homeDir, { withFileTypes: true });
+	} catch (err) {
+		logger.warn('Failed to discover Claude config dirs', LOG_CONTEXT, {
+			homeDir,
+			error: err instanceof Error ? err.message : String(err),
+		});
+		return [];
+	}
+
+	const dirs: string[] = [];
+	for (const entry of entries) {
+		if (!entry.isDirectory()) continue;
+		if (!isLikelyClaudeAccountDirName(entry.name)) continue;
+		if (ACCOUNT_DIR_EXCLUDE_RE.test(entry.name)) continue;
+
+		const dir = path.join(homeDir, entry.name);
+		try {
+			fs.accessSync(path.join(dir, '.claude.json'), fs.constants.R_OK);
+		} catch {
+			continue;
+		}
+		dirs.push(dir);
+	}
+
+	return dirs.sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -298,6 +342,19 @@ export async function runStartupUsageSampling(deps: StartupUsageSamplingDeps): P
 		if (!target) continue;
 		if (!targetsByKey.has(target.configDirKey)) {
 			targetsByKey.set(target.configDirKey, target);
+		}
+	}
+
+	if (mode === 'manual') {
+		for (const configDir of discoverClaudeConfigDirs()) {
+			const configDirKey = resolveConfigDirKey({ CLAUDE_CONFIG_DIR: configDir });
+			if (targetsByKey.has(configDirKey)) continue;
+			targetsByKey.set(configDirKey, {
+				configDir,
+				configDirKey,
+				cwd: os.homedir(),
+				customEnvVars: { ...agentLevelEnvVars, CLAUDE_CONFIG_DIR: configDir },
+			});
 		}
 	}
 
