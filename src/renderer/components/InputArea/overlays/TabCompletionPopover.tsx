@@ -101,6 +101,7 @@ export const TabCompletionPopover = memo(function TabCompletionPopover({
 							return (
 								<button
 									key={filterType}
+									type="button"
 									onClick={(e) => {
 										e.stopPropagation();
 										setFilter(filterType);

@@ -41,6 +41,7 @@ export const CommandHistoryPopover = memo(function CommandHistoryPopover({
 		setFilter('');
 		setTimeout(() => inputRef.current?.focus(), 0);
 	};
+	const visibleHistory = filteredHistory.slice(0, 5);
 
 	return (
 		<div
@@ -63,14 +64,14 @@ export const CommandHistoryPopover = memo(function CommandHistoryPopover({
 					onKeyDown={(e) => {
 						if (e.key === 'ArrowDown') {
 							e.preventDefault();
-							setSelectedIndex(Math.min(selectedIndex + 1, filteredHistory.length - 1));
+							setSelectedIndex(Math.min(selectedIndex + 1, Math.max(visibleHistory.length - 1, 0)));
 						} else if (e.key === 'ArrowUp') {
 							e.preventDefault();
 							setSelectedIndex(Math.max(selectedIndex - 1, 0));
 						} else if (e.key === 'Enter') {
 							e.preventDefault();
-							if (filteredHistory[selectedIndex]) {
-								setInputValue(filteredHistory[selectedIndex]);
+							if (visibleHistory[selectedIndex]) {
+								setInputValue(visibleHistory[selectedIndex]);
 								closeAndFocusInput();
 							}
 						} else if (e.key === 'Escape') {
@@ -82,7 +83,7 @@ export const CommandHistoryPopover = memo(function CommandHistoryPopover({
 				/>
 			</div>
 			<div className="max-h-48 overflow-y-auto scrollbar-thin">
-				{filteredHistory.slice(0, 5).map((cmd, idx) => {
+				{visibleHistory.map((cmd, idx) => {
 					const isSelected = idx === selectedIndex;
 					const isMostRecent = idx === 0;
 

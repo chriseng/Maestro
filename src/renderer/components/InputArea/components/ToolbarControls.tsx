@@ -7,6 +7,7 @@ import {
 	formatShortcutKeys,
 } from '../../../utils/shortcutFormatter';
 import { getReadOnlyModeLabel, getReadOnlyModeTooltip } from '../../../../shared/agentMetadata';
+import { captureException } from '../../../utils/sentry';
 import { addStagedImageIfUnique } from '../utils/stagedImages';
 import { formatTerminalCwd } from '../utils/terminalPath';
 import { ModelEffortPills } from './ModelEffortPills';
@@ -124,6 +125,31 @@ export const ToolbarControls = memo(function ToolbarControls({
 										addStagedImageIfUnique(prev, imageData, showFlashNotification)
 									);
 								}
+							};
+							reader.onerror = (event) => {
+								captureException(reader.error ?? event, {
+									extra: {
+										component: 'InputArea.ToolbarControls',
+										action: 'attachImage.readError',
+										fileName: file.name,
+										fileType: file.type,
+										fileSize: file.size,
+									},
+								});
+								showFlashNotification?.('Failed to attach image');
+							};
+							reader.onabort = (event) => {
+								captureException(new Error('Image attachment read aborted'), {
+									extra: {
+										component: 'InputArea.ToolbarControls',
+										action: 'attachImage.readAbort',
+										fileName: file.name,
+										fileType: file.type,
+										fileSize: file.size,
+										eventType: event.type,
+									},
+								});
+								showFlashNotification?.('Image attachment canceled');
 							};
 							reader.readAsDataURL(file);
 						});

@@ -45,6 +45,10 @@ describe('TabCompletionPopover', () => {
 				itemRefs={createItemRefs<HTMLButtonElement>()}
 				theme={inputAreaTheme}
 				setInputValue={vi.fn()}
+				setOpen={vi.fn()}
+				setFilter={vi.fn()}
+				setSelectedIndex={vi.fn()}
+				isGitRepo={false}
 				inputRef={{ current: null }}
 			/>
 		);

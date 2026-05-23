@@ -66,10 +66,13 @@ export const StagedImagesStrip = memo(function StagedImagesStrip({
 						<PenLine className="w-3 h-3" />
 					</button>
 					<button
+						type="button"
 						onClick={(e) => {
 							e.stopPropagation();
 							setStagedImages((p) => p.filter((x) => x !== img));
 						}}
+						title={`Remove image ${idx + 1}`}
+						aria-label={`Remove image ${idx + 1}`}
 						className="absolute top-0.5 right-0.5 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors opacity-90 hover:opacity-100 outline-none focus-visible:ring-2 focus-visible:ring-white"
 					>
 						<X className="w-3 h-3" />

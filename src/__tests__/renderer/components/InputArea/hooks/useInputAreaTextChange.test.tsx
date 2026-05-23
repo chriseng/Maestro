@@ -86,6 +86,6 @@ describe('useInputAreaTextChange', () => {
 			target: { value: '@src', selectionStart: 4 },
 		});
 
-		expect(handlers.setAtMentionOpen).not.toHaveBeenCalledWith(true);
+		expect(handlers.setAtMentionOpen).not.toHaveBeenCalled();
 	});
 });
