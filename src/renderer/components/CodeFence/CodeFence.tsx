@@ -59,23 +59,20 @@ export const CodeFence = memo(function CodeFence({
 		let cancelled = false;
 		const stale = () => cancelled || userOverrodeRef.current;
 		void (async () => {
-			const resolved = await resolveLanguage(language);
+			// An explicit, resolvable fence tag (e.g. `ts`, `python`) is trusted
+			// as-is. We only consult the alias table for explicit tags — a bare
+			// fence resolves to `text`, which would otherwise short-circuit the
+			// auto-detection below and leave untagged code blocks unhighlighted.
+			const resolved = isExplicitLang(language) ? await resolveLanguage(language) : null;
 			if (stale()) return;
 			if (resolved) {
 				setResolvedLang(resolved);
 				return;
 			}
-			// No explicit language (or unknown one) — try auto-detection.
-			if (!isExplicitLang(language)) {
-				const detected = await detectLanguage(code);
-				if (stale()) return;
-				if (detected) {
-					setResolvedLang(detected.language);
-					return;
-				}
-			}
+			// No explicit language (or an unknown tag) — guess from the body.
+			const detected = await detectLanguage(code);
 			if (stale()) return;
-			setResolvedLang(FALLBACK_LANG);
+			setResolvedLang(detected?.language ?? FALLBACK_LANG);
 		})();
 		return () => {
 			cancelled = true;

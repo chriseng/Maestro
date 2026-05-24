@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MarkdownRenderer } from '../../../renderer/components/MarkdownRenderer';
 
 import { mockTheme } from '../../helpers/mockTheme';
@@ -16,9 +16,14 @@ vi.mock('shiki', () => ({
 	bundledLanguagesAlias: {},
 }));
 
-// Mock highlight.js so detection imports don't blow up in jsdom.
+// Mock highlight.js so detection imports don't blow up in jsdom. Exposed as a
+// controllable spy (default: no confident guess) so individual tests can make
+// auto-detection succeed without affecting the others.
+const { mockHighlightAuto } = vi.hoisted(() => ({
+	mockHighlightAuto: vi.fn(() => ({ language: null, relevance: 0 })),
+}));
 vi.mock('highlight.js', () => ({
-	default: { highlightAuto: () => ({ language: null, relevance: 0 }) },
+	default: { highlightAuto: mockHighlightAuto },
 }));
 
 // Mock lucide-react icons
@@ -247,6 +252,19 @@ describe('MarkdownRenderer', () => {
 			const highlighter = container.querySelector('[data-testid="code-fence"]');
 			expect(highlighter).toBeInTheDocument();
 			expect(highlighter!.getAttribute('data-language')).toBe('text');
+		});
+
+		it('auto-detects the language for an untagged fence', async () => {
+			// Regression: a bare ``` fence used to resolve to `text` and skip
+			// detection entirely, leaving the block unhighlighted until the user
+			// manually picked a language. It must now guess from the body.
+			mockHighlightAuto.mockReturnValueOnce({ language: 'javascript', relevance: 10 });
+			const content = '```\nconsole.log("hello world");\n```';
+			const { container } = renderMd(content);
+			await waitFor(() => {
+				const highlighter = container.querySelector('[data-testid="code-fence"]');
+				expect(highlighter!.getAttribute('data-language')).toBe('javascript');
+			});
 		});
 
 		it('renders multiple code blocks', () => {
