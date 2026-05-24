@@ -42,10 +42,10 @@ function isLikelyCodexAccountDirName(name: string): boolean {
  * Discover local Codex account homes, mirroring `/token-cockpit` setups where
  * each OAuth account has its own `CODEX_HOME`.
  */
-export function discoverCodexHomes(homeDir = os.homedir()): string[] {
+export async function discoverCodexHomes(homeDir = os.homedir()): Promise<string[]> {
 	let entries: fs.Dirent[];
 	try {
-		entries = fs.readdirSync(homeDir, { withFileTypes: true });
+		entries = await fs.promises.readdir(homeDir, { withFileTypes: true });
 	} catch (err) {
 		logger.warn('Failed to discover Codex homes', LOG_CONTEXT, {
 			homeDir,
@@ -61,7 +61,7 @@ export function discoverCodexHomes(homeDir = os.homedir()): string[] {
 		if (ACCOUNT_DIR_EXCLUDE_RE.test(entry.name)) continue;
 		const codexHome = path.join(homeDir, entry.name);
 		try {
-			fs.accessSync(path.join(codexHome, 'auth.json'), fs.constants.R_OK);
+			await fs.promises.access(path.join(codexHome, 'auth.json'), fs.constants.R_OK);
 		} catch {
 			continue;
 		}
@@ -86,7 +86,11 @@ function buildTarget(
 			? (session.customEnvVars as Record<string, string>)
 			: {};
 	const merged = { ...agentLevelEnvVars, ...sessionEnvVars };
-	const codexHome = merged.CODEX_HOME || path.join(os.homedir(), '.codex');
+	const configuredCodexHome =
+		typeof merged.CODEX_HOME === 'string' && merged.CODEX_HOME.length > 0
+			? merged.CODEX_HOME
+			: null;
+	const codexHome = configuredCodexHome ?? path.join(os.homedir(), '.codex');
 	const codexHomeKey = resolveCodexHomeKey({ CODEX_HOME: codexHome });
 	return { codexHome, codexHomeKey };
 }
@@ -110,7 +114,7 @@ export async function runCodexUsageSampling(deps: CodexUsageSamplingDeps): Promi
 		}
 	}
 
-	for (const codexHome of discoverCodexHomes()) {
+	for (const codexHome of await discoverCodexHomes()) {
 		const codexHomeKey = resolveCodexHomeKey({ CODEX_HOME: codexHome });
 		if (!targetsByKey.has(codexHomeKey)) {
 			targetsByKey.set(codexHomeKey, { codexHome, codexHomeKey });
@@ -118,7 +122,11 @@ export async function runCodexUsageSampling(deps: CodexUsageSamplingDeps): Promi
 	}
 
 	if (targetsByKey.size === 0) {
-		const fallbackHome = agentLevelEnvVars.CODEX_HOME || path.join(os.homedir(), '.codex');
+		const configuredFallbackHome =
+			typeof agentLevelEnvVars.CODEX_HOME === 'string' && agentLevelEnvVars.CODEX_HOME.length > 0
+				? agentLevelEnvVars.CODEX_HOME
+				: null;
+		const fallbackHome = configuredFallbackHome ?? path.join(os.homedir(), '.codex');
 		const fallbackKey = resolveCodexHomeKey({ CODEX_HOME: fallbackHome });
 		targetsByKey.set(fallbackKey, { codexHome: fallbackHome, codexHomeKey: fallbackKey });
 	}
@@ -129,8 +137,8 @@ export async function runCodexUsageSampling(deps: CodexUsageSamplingDeps): Promi
 
 	await Promise.all(
 		Array.from(targetsByKey.values()).map(async (target) => {
-			const snapshot = await sampleCodexUsage({ codexHome: target.codexHome });
 			try {
+				const snapshot = await sampleCodexUsage({ codexHome: target.codexHome });
 				setCodexUsageSnapshot(snapshot);
 				logger.info('Stored Codex usage snapshot', LOG_CONTEXT, {
 					codexHomeKey: snapshot.codexHomeKey,
@@ -139,7 +147,7 @@ export async function runCodexUsageSampling(deps: CodexUsageSamplingDeps): Promi
 					weeklyPercent: snapshot.weekly?.percent,
 				});
 			} catch (err) {
-				logger.warn('Failed to persist Codex usage snapshot', LOG_CONTEXT, {
+				logger.warn('Failed to sample Codex usage snapshot', LOG_CONTEXT, {
 					codexHomeKey: target.codexHomeKey,
 					error: err instanceof Error ? err.message : String(err),
 				});

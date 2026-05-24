@@ -97,4 +97,41 @@ describe('codex-usage-sampler', () => {
 			],
 		});
 	});
+
+	it('drops non-finite usage percentages from quota windows', async () => {
+		await fs.writeFile(
+			path.join(TEST_ROOT, 'auth.json'),
+			JSON.stringify({
+				tokens: {
+					access_token: 'redacted-token',
+				},
+			})
+		);
+		vi.mocked(globalThis.fetch).mockResolvedValue({
+			ok: true,
+			status: 200,
+			json: vi.fn().mockResolvedValue({
+				email: 'codex@example.com',
+				rate_limit: {
+					primary_window: { used_percent: Number.NaN, reset_at: 1779550000 },
+					secondary_window: { used_percent: Number.POSITIVE_INFINITY, reset_at: 1779900000 },
+				},
+				additional_rate_limits: [
+					{
+						limit_name: 'bad-window',
+						rate_limit: {
+							primary_window: { used_percent: Number.NaN, reset_at: 1779560000 },
+						},
+					},
+				],
+			}),
+		} as unknown as Response);
+
+		const snapshot = await sampleCodexUsage({ codexHome: TEST_ROOT });
+
+		expect(snapshot.authState).toBe('authenticated');
+		expect(snapshot.session).toBeUndefined();
+		expect(snapshot.weekly).toBeUndefined();
+		expect(snapshot.additionalLimits).toEqual([]);
+	});
 });

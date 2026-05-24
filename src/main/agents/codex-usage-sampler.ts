@@ -160,7 +160,9 @@ export async function sampleCodexUsage(opts: SampleCodexUsageOptions): Promise<C
 
 function parseWindow(window: WhamUsageWindow | undefined): CodexUsageSnapshot['session'] | null {
 	if (!window) return null;
-	if (typeof window.used_percent !== 'number') return null;
+	if (typeof window.used_percent !== 'number' || !Number.isFinite(window.used_percent)) {
+		return null;
+	}
 	const resetsAt = parseResetAt(window.reset_at);
 	if (!resetsAt) return null;
 	return {

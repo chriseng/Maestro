@@ -431,6 +431,10 @@ export const ClaudePlanUsage = memo(function ClaudePlanUsage({
 		}
 		setVisualBusy(false);
 	}, [refreshing, visualBusy]);
+	const handleRefreshRef = useRef(handleRefresh);
+	useEffect(() => {
+		handleRefreshRef.current = handleRefresh;
+	}, [handleRefresh]);
 
 	const isBusy = refreshing || visualBusy;
 
@@ -463,16 +467,10 @@ export const ClaudePlanUsage = memo(function ClaudePlanUsage({
 		if (configuredAccountKeys.length === 0) return;
 		if (snapshotCount === 0) return;
 		const timer = window.setInterval(() => {
-			void handleRefresh();
+			void handleRefreshRef.current();
 		}, refreshIntervalMs);
 		return () => window.clearInterval(timer);
-	}, [
-		showRefreshButton,
-		refreshIntervalMs,
-		configuredAccountKeys.length,
-		snapshotCount,
-		handleRefresh,
-	]);
+	}, [showRefreshButton, refreshIntervalMs, configuredAccountKeys.length, snapshotCount]);
 
 	const renderAccount = useCallback(
 		(configDirKey: string) => {

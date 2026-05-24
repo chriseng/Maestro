@@ -103,10 +103,10 @@ function isLikelyClaudeAccountDirName(name: string): boolean {
  * `~/.claude-*` directory. Backups and local/server scratch dirs are skipped
  * so the dashboard lists active accounts, not migration leftovers.
  */
-export function discoverClaudeConfigDirs(homeDir = os.homedir()): string[] {
+export async function discoverClaudeConfigDirs(homeDir = os.homedir()): Promise<string[]> {
 	let entries: fs.Dirent[];
 	try {
-		entries = fs.readdirSync(homeDir, { withFileTypes: true });
+		entries = await fs.promises.readdir(homeDir, { withFileTypes: true });
 	} catch (err) {
 		logger.warn('Failed to discover Claude config dirs', LOG_CONTEXT, {
 			homeDir,
@@ -123,7 +123,7 @@ export function discoverClaudeConfigDirs(homeDir = os.homedir()): string[] {
 
 		const dir = path.join(homeDir, entry.name);
 		try {
-			fs.accessSync(path.join(dir, '.claude.json'), fs.constants.R_OK);
+			await fs.promises.access(path.join(dir, '.claude.json'), fs.constants.R_OK);
 		} catch {
 			continue;
 		}
@@ -346,7 +346,7 @@ export async function runStartupUsageSampling(deps: StartupUsageSamplingDeps): P
 	}
 
 	if (mode === 'manual') {
-		for (const configDir of discoverClaudeConfigDirs()) {
+		for (const configDir of await discoverClaudeConfigDirs()) {
 			const configDirKey = resolveConfigDirKey({ CLAUDE_CONFIG_DIR: configDir });
 			if (targetsByKey.has(configDirKey)) continue;
 			targetsByKey.set(configDirKey, {

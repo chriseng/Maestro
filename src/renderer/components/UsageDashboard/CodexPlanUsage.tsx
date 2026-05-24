@@ -397,6 +397,10 @@ export const CodexPlanUsage = memo(function CodexPlanUsage({
 		}
 		setVisualBusy(false);
 	}, [refreshing, visualBusy]);
+	const handleRefreshRef = useRef(handleRefresh);
+	useEffect(() => {
+		handleRefreshRef.current = handleRefresh;
+	}, [handleRefresh]);
 
 	const autoRefreshFiredRef = useRef(false);
 	useEffect(() => {
@@ -422,16 +426,10 @@ export const CodexPlanUsage = memo(function CodexPlanUsage({
 		if (configuredAccountKeys.length === 0) return;
 		if (snapshotCount === 0) return;
 		const timer = window.setInterval(() => {
-			void handleRefresh();
+			void handleRefreshRef.current();
 		}, refreshIntervalMs);
 		return () => window.clearInterval(timer);
-	}, [
-		showRefreshButton,
-		refreshIntervalMs,
-		configuredAccountKeys.length,
-		snapshotCount,
-		handleRefresh,
-	]);
+	}, [showRefreshButton, refreshIntervalMs, configuredAccountKeys.length, snapshotCount]);
 
 	const isBusy = refreshing || visualBusy;
 	const renderAccount = useCallback(
@@ -510,7 +508,7 @@ export const CodexPlanUsage = memo(function CodexPlanUsage({
 							{isBusy ? (
 								<>
 									<span
-										className="absolute inset-0 pointer-events-none claude-plan-refresh-sweep"
+										className="absolute inset-0 pointer-events-none codex-plan-refresh-sweep"
 										style={{
 											backgroundImage: `linear-gradient(90deg, transparent 0%, ${theme.colors.bgMain}66 50%, transparent 100%)`,
 										}}
