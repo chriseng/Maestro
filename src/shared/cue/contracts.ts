@@ -334,6 +334,14 @@ export interface CueRunResult {
 	durationMs: number;
 	startedAt: string;
 	endedAt: string;
+	/**
+	 * Provider session id (e.g. Claude's `session_id`) parsed from the agent's
+	 * stdout. Distinct from `sessionId`, which is the Maestro agent id. Used by
+	 * the Cue stats dashboard to attribute token usage to the on-disk session
+	 * file the run actually produced. Undefined for shell/CLI command runs (no
+	 * AI session) and for runs whose stdout carried no parseable session id.
+	 */
+	providerSessionId?: string | null;
 }
 
 /** Status summary for a Cue-enabled session */

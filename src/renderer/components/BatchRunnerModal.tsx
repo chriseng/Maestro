@@ -440,6 +440,11 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 	// Block launch (but not configuration) while the agent for this session is mid-thought.
 	const isAgentBusy = activeSession?.state === 'busy' || activeSession?.state === 'connecting';
 
+	// Dispatching to a separate worktree spawns/uses a different agent, so the current
+	// session being busy is irrelevant — let the user launch regardless. (Busy open-worktree
+	// targets are already disabled in the WorktreeRunSection dropdown.)
+	const blocksLaunchWhileBusy = isAgentBusy && worktreeTarget === null;
+
 	useModalLayer(MODAL_PRIORITIES.BATCH_RUNNER, undefined, () => {
 		if (showDeleteConfirmModal) {
 			handleCancelDeletePlaybook();
@@ -1018,7 +1023,7 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 								documents.length === missingDocCount ||
 								isPromptEmpty ||
 								!hasValidPrompt ||
-								isAgentBusy
+								blocksLaunchWhileBusy
 							}
 							className="flex items-center gap-2 px-4 py-2 rounded text-white font-bold disabled:opacity-40 disabled:cursor-not-allowed"
 							style={{
@@ -1029,14 +1034,14 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 									documents.length === missingDocCount ||
 									isPromptEmpty ||
 									!hasValidPrompt ||
-									isAgentBusy
+									blocksLaunchWhileBusy
 										? theme.colors.textDim
 										: theme.colors.accent,
 							}}
 							title={
 								isPreparingWorktree
 									? 'Preparing worktree...'
-									: isAgentBusy
+									: blocksLaunchWhileBusy
 										? 'Agent is thinking — finish or interrupt the current task before launching auto-run'
 										: isPromptEmpty
 											? 'Agent prompt cannot be empty'

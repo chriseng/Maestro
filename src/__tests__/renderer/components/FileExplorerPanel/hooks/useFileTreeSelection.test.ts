@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useRef } from 'react';
 import { useFileTreeSelection } from '../../../../../renderer/components/FileExplorerPanel/hooks/useFileTreeSelection';
+import { useFileExplorerStore } from '../../../../../renderer/stores/fileExplorerStore';
 import type { FlattenedNode } from '../../../../../renderer/components/FileExplorerPanel/types';
 
 const makeFlattened = (paths: string[]): FlattenedNode[] =>
@@ -114,6 +115,34 @@ describe('useFileTreeSelection', () => {
 		});
 		// All 4 should be selected because anchor is still 0
 		expect(result.current.selectedPaths.size).toBe(4);
+	});
+
+	it('plain click writes the range anchor into the store', () => {
+		const { result } = renderSelectionHook(['a.ts', 'b.ts', 'c.ts'], 'sess', 0);
+		const e = { shiftKey: false, metaKey: false, ctrlKey: false } as React.MouseEvent;
+		act(() => {
+			result.current.handleRowSelectionClick(e, 2, 'c.ts');
+		});
+		// The anchor lives in the store so a subsequent keyboard Shift+Arrow (handled
+		// elsewhere) pivots from where the mouse last landed.
+		expect(useFileExplorerStore.getState().selectionAnchorIndex).toBe(2);
+	});
+
+	it('shift-click pivots from the store anchor (shared with keyboard nav), not selectedFileIndex', () => {
+		// selectedFileIndex prop is 0, but a prior keyboard move set the store
+		// anchor to 2. Shift-clicking row 0 must select [0..2] using the store
+		// anchor — proving mouse and keyboard extend the SAME selection.
+		const { result } = renderSelectionHook(['a.ts', 'b.ts', 'c.ts', 'd.ts'], 'sess', 0);
+		act(() => {
+			useFileExplorerStore.getState().setSelectionAnchorIndex(2);
+		});
+		const e = { shiftKey: true, metaKey: false, ctrlKey: false } as React.MouseEvent;
+		act(() => {
+			result.current.handleRowSelectionClick(e, 0, 'a.ts');
+		});
+		expect([...result.current.selectedPaths].sort()).toEqual(['a.ts', 'b.ts', 'c.ts']);
+		// Anchor stays put across the shift-click.
+		expect(useFileExplorerStore.getState().selectionAnchorIndex).toBe(2);
 	});
 
 	it('selectedPathsRef mirror stays in sync', () => {
