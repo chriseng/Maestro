@@ -421,6 +421,12 @@ async function detectAgentsRemote(sshRemote: SshRemoteConfig): Promise<any[]> {
 					}
 				} else if (!connectionError && existing?.status !== 'not_installed') {
 					capabilitySnapshots.markNotInstalled(agentDef.id, sshRemote.id);
+				} else if (connectionError && existing?.status !== 'failed') {
+					// In-band SSH connection failure: stderr matched a connection
+					// error without throwing, so the catch below never runs. Resolve
+					// a pending `probing` snapshot (from an `agents:reprobe`) to
+					// `failed` instead of leaving the status pill spinning forever.
+					capabilitySnapshots.markFailed(agentDef.id, connectionError, sshRemote.id);
 				}
 			}
 		} catch (error) {
