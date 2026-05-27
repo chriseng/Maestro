@@ -177,6 +177,10 @@ describe('useRemoteIntegration', () => {
 			return () => {};
 		}),
 		sendRemoteRenameSessionResponse: vi.fn(),
+		onRemoteUpdateSessionCwd: vi.fn().mockImplementation(() => {
+			return () => {};
+		}),
+		sendRemoteUpdateSessionCwdResponse: vi.fn(),
 		onRemoteCreateGroup: vi.fn().mockImplementation(() => {
 			return () => {};
 		}),

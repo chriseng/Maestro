@@ -268,6 +268,16 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				// Allow focusBrowserAddress (Cmd+L) to focus address bar when browser tab is active overlay
 				const isBrowserAddressShortcut =
 					ctx.isTabShortcut(e, 'focusBrowserAddress') && !!ctx.activeSession?.activeBrowserTabId;
+				// Allow browser-tab Cmd+F (in-page find) to reach its handler even when
+				// modals/overlays are open. The find bar is locally-scoped to the
+				// browser tab; the overlay-guard's broader "block app shortcuts"
+				// behavior would otherwise eat it.
+				const isBrowserFindShortcut =
+					(e.metaKey || e.ctrlKey) &&
+					!e.altKey &&
+					!e.shiftKey &&
+					e.key.toLowerCase() === 'f' &&
+					!!ctx.activeSession?.activeBrowserTabId;
 				// Allow font size shortcuts (Cmd+=/+, Cmd+-, Cmd+0) even when modals/overlays are open
 				const isFontSizeShortcut =
 					(e.metaKey || e.ctrlKey) &&
@@ -311,6 +321,7 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 						!isTabSwitcherShortcut &&
 						!isToggleModeShortcut &&
 						!isBrowserAddressShortcut &&
+						!isBrowserFindShortcut &&
 						!isFontSizeShortcut
 					) {
 						return;
@@ -1059,6 +1070,15 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 
 			// Cmd+F contextual shortcuts - prioritize explicit focus over input mode
 			if (e.key === 'f' && (e.metaKey || e.ctrlKey) && !e.shiftKey) {
+				// Browser-tab in-page find takes precedence whenever a browser tab is
+				// the active tab. Routed both here (when webview isn't focused) and via
+				// `onBrowserTabShortcutKey` (when it is).
+				if (ctx.activeSession?.activeBrowserTabId && !e.altKey) {
+					e.preventDefault();
+					ctx.mainPanelRef?.current?.openBrowserFind();
+					trackShortcut('searchOutput');
+					return;
+				}
 				if (ctx.activeFocus === 'right' && ctx.activeRightTab === 'files') {
 					e.preventDefault();
 					ctx.setFileTreeFilterOpen(true);
@@ -1113,6 +1133,19 @@ export function useMainKeyboardHandler(): UseMainKeyboardHandlerReturn {
 				});
 				if (ctx.isTabShortcut(probe, 'focusBrowserAddress')) {
 					ctx.mainPanelRef?.current?.focusBrowserAddressBar();
+					return;
+				}
+				// Cmd+F arrives here when forwarded from the webview guest. Open the
+				// in-page find bar directly instead of re-dispatching through the
+				// window keydown handler (which would land in the activeFocus-gated
+				// Cmd+F switch below and miss the browser-tab case).
+				if (
+					(input.meta || input.control) &&
+					!input.alt &&
+					!input.shift &&
+					(input.key === 'f' || input.key === 'F')
+				) {
+					ctx.mainPanelRef?.current?.openBrowserFind();
 					return;
 				}
 			}

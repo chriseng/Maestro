@@ -289,6 +289,7 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 	{
 		id: 'gemini-cli',
 		name: 'Gemini CLI',
+		hidden: true, // Not shipping; superseded by Antigravity. Kept for type/back-compat, hidden from UI.
 		binaryName: 'gemini',
 		command: 'gemini',
 		args: [],
@@ -341,6 +342,7 @@ export const AGENT_DEFINITIONS: AgentDefinition[] = [
 	{
 		id: 'qwen3-coder',
 		name: 'Qwen3 Coder',
+		hidden: true, // Not shipping. Kept for type/back-compat, hidden from UI.
 		binaryName: 'qwen3-coder',
 		command: 'qwen3-coder',
 		args: [],

@@ -29,6 +29,7 @@ src/cli/
 │   ├── refresh-auto-run.ts
 │   ├── refresh-files.ts
 │   ├── remove-agent.ts       # Remove agent via WebSocket (requires running app)
+│   ├── update-agent.ts       # Move agent to group / change cwd via WebSocket (requires running app)
 │   ├── remove-ssh-remote.ts  # Remove SSH remote via disk I/O
 │   ├── run-playbook.ts
 │   ├── send.ts
@@ -224,6 +225,18 @@ Remove an agent via WebSocket (`withMaestroClient`). Sends a `delete_session` me
 ```bash
 maestro-cli remove-agent <agent-id> [--json]
 ```
+
+### `update-agent <agent-id>`
+
+Mutate an existing agent in place via WebSocket (`withMaestroClient`). At least one of `--group` or `--cwd` is required; the command fans out one round-trip per flag.
+
+```bash
+maestro-cli update-agent <agent-id> [-g <group-id|none>] [-d <new-cwd>] [--json]
+```
+
+- `--group <id>` sends a `move_session_to_group` message (reuses the same write path as drag-and-drop in the Left Bar). Pass `none`, `null`, or `""` to ungroup. Supports partial group IDs via `resolveGroupId()`.
+- `--cwd <path>` sends the new `update_session_cwd` message. Resolves to absolute via `path.resolve()`. The renderer mutates `cwd`/`fullPath`/`shellCwd` only — `projectRoot` is preserved so historical provider sessions stay addressable (important for archive workflows where you relocate the case folder but want prior conversations to remain attached).
+- The renderer refuses cwd updates when `aiPid > 0` (the PTY's cwd is fixed at spawn time) and returns `{ success: false, error: '...' }`; the CLI surfaces that error and exits non-zero.
 
 ### `list ssh-remotes`
 
@@ -616,6 +629,7 @@ Machine-parseable output format. Each line is a complete JSON object. Used when 
 | Run playbook        | `src/cli/commands/run-playbook.ts`                                                     |
 | Create agent        | `src/cli/commands/create-agent.ts`                                                     |
 | Remove agent        | `src/cli/commands/remove-agent.ts`                                                     |
+| Update agent        | `src/cli/commands/update-agent.ts`                                                     |
 | SSH remote CRUD     | `src/cli/commands/create-ssh-remote.ts`, `list-ssh-remotes.ts`, `remove-ssh-remote.ts` |
 | Shared types        | `src/shared/types.ts`                                                                  |
 | Template variables  | `src/shared/templateVariables.ts`                                                      |

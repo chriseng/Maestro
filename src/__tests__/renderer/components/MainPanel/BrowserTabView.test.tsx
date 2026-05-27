@@ -34,6 +34,8 @@ type MockWebview = HTMLElement & {
 	isLoading: ReturnType<typeof vi.fn>;
 	getWebContentsId: ReturnType<typeof vi.fn>;
 	executeJavaScript: ReturnType<typeof vi.fn>;
+	findInPage?: ReturnType<typeof vi.fn>;
+	stopFindInPage?: ReturnType<typeof vi.fn>;
 };
 
 describe('BrowserTabView', () => {
@@ -512,6 +514,114 @@ describe('BrowserTabView', () => {
 			render(<BrowserTabView ref={ref} tab={mockTab} theme={mockTheme} onUpdateTab={vi.fn()} />);
 
 			expect(ref.current!.getTabId()).toBe('browser-1');
+		});
+	});
+
+	describe('find in page (Cmd+F)', () => {
+		it('mounts the find bar, runs findInPage on query, and stops on Escape', async () => {
+			const ref = React.createRef<BrowserTabViewHandle>();
+			render(<BrowserTabView ref={ref} tab={mockTab} theme={mockTheme} onUpdateTab={vi.fn()} />);
+
+			const webview = getWebview();
+			const findInPage = vi.fn().mockReturnValue(42);
+			const stopFindInPage = vi.fn();
+			webview.findInPage = findInPage;
+			webview.stopFindInPage = stopFindInPage;
+
+			// Bar is hidden by default
+			expect(screen.queryByTestId('browser-tab-find-bar')).toBeNull();
+
+			act(() => {
+				ref.current!.openFind();
+			});
+
+			const bar = await screen.findByTestId('browser-tab-find-bar');
+			expect(bar).toBeTruthy();
+			const input = bar.querySelector('input') as HTMLInputElement;
+			expect(input).toBeTruthy();
+			// Cmd+F must focus the input so the user can start typing immediately.
+			// The host's focus-stealing-prevention guard must explicitly leave this
+			// input alone; without the carve-out it would re-blur on the next tick.
+			await waitFor(() => expect(document.activeElement).toBe(input));
+
+			// Typing kicks off findInPage
+			await act(async () => {
+				fireEvent.change(input, { target: { value: 'hello' } });
+			});
+			expect(findInPage).toHaveBeenCalledWith('hello');
+
+			// found-in-page result wires up the counter
+			await act(async () => {
+				const event = new Event('found-in-page') as Event & {
+					result?: { requestId: number; activeMatchOrdinal: number; matches: number };
+				};
+				event.result = { requestId: 42, activeMatchOrdinal: 2, matches: 7 };
+				webview.dispatchEvent(event);
+			});
+			expect(bar.textContent).toContain('2/7');
+
+			// Enter advances to next match
+			findInPage.mockClear();
+			await act(async () => {
+				fireEvent.keyDown(input, { key: 'Enter' });
+			});
+			expect(findInPage).toHaveBeenCalledWith('hello', { forward: true, findNext: true });
+
+			// Shift+Enter goes back
+			findInPage.mockClear();
+			await act(async () => {
+				fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+			});
+			expect(findInPage).toHaveBeenCalledWith('hello', { forward: false, findNext: true });
+
+			// Escape closes and stops the find
+			stopFindInPage.mockClear();
+			await act(async () => {
+				fireEvent.keyDown(input, { key: 'Escape' });
+			});
+			expect(screen.queryByTestId('browser-tab-find-bar')).toBeNull();
+			expect(stopFindInPage).toHaveBeenCalledWith('clearSelection');
+		});
+
+		it('ignores stale found-in-page results from a prior query', async () => {
+			const ref = React.createRef<BrowserTabViewHandle>();
+			render(<BrowserTabView ref={ref} tab={mockTab} theme={mockTheme} onUpdateTab={vi.fn()} />);
+
+			const webview = getWebview();
+			let nextRequestId = 100;
+			webview.findInPage = vi.fn(() => ++nextRequestId);
+			webview.stopFindInPage = vi.fn();
+
+			act(() => {
+				ref.current!.openFind();
+			});
+			const bar = await screen.findByTestId('browser-tab-find-bar');
+			const input = bar.querySelector('input') as HTMLInputElement;
+
+			// Query 1 (requestId 101)
+			await act(async () => {
+				fireEvent.change(input, { target: { value: 'first' } });
+			});
+			// Query 2 (requestId 102)
+			await act(async () => {
+				fireEvent.change(input, { target: { value: 'second' } });
+			});
+
+			// Stale result for query 1 arrives AFTER query 2 fired
+			await act(async () => {
+				const stale = new Event('found-in-page') as Event & { result?: object };
+				stale.result = { requestId: 101, activeMatchOrdinal: 5, matches: 5 };
+				webview.dispatchEvent(stale);
+			});
+			expect(bar.textContent).not.toContain('5/5');
+
+			// Fresh result for query 2 updates the counter
+			await act(async () => {
+				const fresh = new Event('found-in-page') as Event & { result?: object };
+				fresh.result = { requestId: 102, activeMatchOrdinal: 1, matches: 3 };
+				webview.dispatchEvent(fresh);
+			});
+			expect(bar.textContent).toContain('1/3');
 		});
 	});
 });

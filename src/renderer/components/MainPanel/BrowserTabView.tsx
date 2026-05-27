@@ -6,7 +6,16 @@ import React, {
 	useRef,
 	useState,
 } from 'react';
-import { ArrowLeft, ArrowRight, ExternalLink, Globe, RotateCw } from 'lucide-react';
+import {
+	ArrowLeft,
+	ArrowRight,
+	ChevronDown,
+	ChevronUp,
+	ExternalLink,
+	Globe,
+	RotateCw,
+	X,
+} from 'lucide-react';
 import { Spinner } from '../ui/Spinner';
 import type { BrowserTab, Theme } from '../../types';
 import {
@@ -29,6 +38,11 @@ type ElectronWebviewElement = HTMLElement & {
 	isLoading: () => boolean;
 	getWebContentsId?: () => number;
 	executeJavaScript: (code: string) => Promise<unknown>;
+	findInPage: (
+		text: string,
+		options?: { forward?: boolean; findNext?: boolean; matchCase?: boolean }
+	) => number;
+	stopFindInPage: (action: 'clearSelection' | 'keepSelection' | 'activateSelection') => void;
 };
 
 interface BrowserTabViewProps {
@@ -47,6 +61,8 @@ export interface BrowserTabViewHandle {
 	getContent(): Promise<string>;
 	/** The tabId this view is currently rendering — used for ref-to-tab reconciliation. */
 	getTabId(): string;
+	/** Open the in-page find bar and focus its input. */
+	openFind(): void;
 }
 
 function syncWebviewLayout(webview: ElectronWebviewElement | null) {
@@ -83,6 +99,11 @@ export const BrowserTabView = React.memo(
 		const [addressValue, setAddressValue] = useState(tab.url);
 		const [addressError, setAddressError] = useState<string | null>(null);
 		const [addressBarHidden, setAddressBarHidden] = useState(false);
+		const [findOpen, setFindOpen] = useState(false);
+		const [findQuery, setFindQuery] = useState('');
+		const [findMatches, setFindMatches] = useState({ active: 0, total: 0 });
+		const findInputRef = useRef<HTMLInputElement | null>(null);
+		const findRequestIdRef = useRef(0);
 
 		useEffect(() => {
 			latestTabRef.current = tab;
@@ -115,6 +136,12 @@ export const BrowserTabView = React.memo(
 				getTabId(): string {
 					return latestTabRef.current.id;
 				},
+				openFind(): void {
+					// State flip; the focus call lives in a useEffect keyed on
+					// `findOpen` so it runs after React commits the input to the DOM
+					// (requestAnimationFrame fired before commit in practice).
+					setFindOpen(true);
+				},
 			}),
 			[]
 		);
@@ -132,9 +159,13 @@ export const BrowserTabView = React.memo(
 			};
 			const onFocusIn = () => {
 				if (!userClickedRef.current) {
-					// Focus was not user-initiated — push it back out.
+					// Focus was not user-initiated — push it back out, but leave the
+					// find-bar input alone (Cmd+F intentionally focuses it
+					// programmatically, and that is exactly the case this guard
+					// would otherwise mistakenly reject).
 					const active = document.activeElement;
-					if (active && host.contains(active)) {
+					const isFindInput = active === findInputRef.current;
+					if (active && host.contains(active) && !isFindInput) {
 						(active as HTMLElement).blur();
 					}
 				}
@@ -288,6 +319,10 @@ export const BrowserTabView = React.memo(
 			// Uses stopImmediatePropagation to prevent any other listener
 			// (including the main-process-injected bubble-phase one) from
 			// double-firing.
+			// `f` is intentionally NOT in the text-editing pass-through list: Cmd+F
+			// must reach the app so the in-page find bar can open. The remaining
+			// letters (a/c/v/x/z) keep their native text-editing behavior inside
+			// page inputs.
 			const keyboardInjection = `(function(){
 			if(window.__maestroShortcutCaptureInstalled)return;
 			window.__maestroShortcutCaptureInstalled=true;
@@ -296,7 +331,7 @@ export const BrowserTabView = React.memo(
 				var hasAlt=e.altKey;
 				if(!hasMod&&!hasAlt)return;
 				var k=e.key.toLowerCase();
-				var te=hasMod&&!hasAlt&&!e.shiftKey&&'acvxzf'.indexOf(k)!==-1;
+				var te=hasMod&&!hasAlt&&!e.shiftKey&&'acvxz'.indexOf(k)!==-1;
 				var re=hasMod&&!hasAlt&&e.shiftKey&&k==='z';
 				if(te||re)return;
 				e.preventDefault();
@@ -330,6 +365,24 @@ export const BrowserTabView = React.memo(
 			};
 			// Re-inject guest listeners on navigation (page JS state resets)
 			const handleDidNavigateForInjection = () => injectGuestListeners();
+			// Find-in-page result reporting. Chromium fires `found-in-page` with
+			// `requestId`, `activeMatchOrdinal`, and `matches`. Stale results from a
+			// prior query can arrive after a newer findInPage() call; we ignore them
+			// by comparing against the latest requestId we issued.
+			const handleFoundInPage = (event: Event) => {
+				const result = (
+					event as Event & {
+						result?: { requestId?: number; activeMatchOrdinal?: number; matches?: number };
+					}
+				).result;
+				if (!result) return;
+				if (typeof result.requestId === 'number' && result.requestId < findRequestIdRef.current)
+					return;
+				setFindMatches({
+					active: result.activeMatchOrdinal ?? 0,
+					total: result.matches ?? 0,
+				});
+			};
 			webview.addEventListener('console-message', handleConsoleMessage);
 			webview.addEventListener('did-start-loading', handleStartLoading);
 			webview.addEventListener('did-stop-loading', handleStopLoading);
@@ -343,6 +396,7 @@ export const BrowserTabView = React.memo(
 			webview.addEventListener('page-title-updated', handleTitleUpdated);
 			webview.addEventListener('page-favicon-updated', handleFaviconUpdated);
 			webview.addEventListener('dom-ready', handleDomReady);
+			webview.addEventListener('found-in-page', handleFoundInPage);
 
 			const resizeObserver =
 				typeof ResizeObserver === 'undefined'
@@ -370,8 +424,80 @@ export const BrowserTabView = React.memo(
 				webview.removeEventListener('page-title-updated', handleTitleUpdated);
 				webview.removeEventListener('page-favicon-updated', handleFaviconUpdated);
 				webview.removeEventListener('dom-ready', handleDomReady);
+				webview.removeEventListener('found-in-page', handleFoundInPage);
 			};
 		}, [onUpdateTab, tab.id, tab.title, tab.url]);
+
+		// Focus the find-bar input whenever it opens. Runs after React commits
+		// the input to the DOM. We focus three times across two animation
+		// frames: once synchronously, and once per frame after, to outlast any
+		// stray focus-stealing on the same tick (host-level guards, page
+		// autofocus that bounces off the recently-blurred webview, etc.).
+		useEffect(() => {
+			if (!findOpen) return;
+			const focusInput = () => {
+				const el = findInputRef.current;
+				if (!el) return;
+				el.focus();
+				el.select();
+			};
+			focusInput();
+			let frame2 = 0;
+			const frame1 = requestAnimationFrame(() => {
+				focusInput();
+				frame2 = requestAnimationFrame(focusInput);
+			});
+			return () => {
+				cancelAnimationFrame(frame1);
+				if (frame2) cancelAnimationFrame(frame2);
+			};
+		}, [findOpen]);
+
+		// Drive findInPage / stopFindInPage off the find-bar state.
+		// Each query change starts a fresh search; an empty query clears highlights.
+		useEffect(() => {
+			const webview = webviewRef.current;
+			if (!webview) return;
+			if (!findOpen || findQuery.length === 0) {
+				try {
+					webview.stopFindInPage('clearSelection');
+				} catch {
+					// webview not ready or already stopped
+				}
+				if (!findOpen) setFindMatches({ active: 0, total: 0 });
+				return;
+			}
+			try {
+				findRequestIdRef.current = webview.findInPage(findQuery);
+			} catch {
+				// webview not ready
+			}
+		}, [findOpen, findQuery]);
+
+		// Stop find when navigating away (page-level state is gone anyway, but this
+		// also prevents leftover match counts from a previous page from being shown).
+		useEffect(() => {
+			if (!findOpen) return;
+			setFindMatches({ active: 0, total: 0 });
+		}, [tab.url, findOpen]);
+
+		const handleFindNext = useCallback(
+			(forward: boolean) => {
+				const webview = webviewRef.current;
+				if (!webview || findQuery.length === 0) return;
+				try {
+					findRequestIdRef.current = webview.findInPage(findQuery, { forward, findNext: true });
+				} catch {
+					// webview not ready
+				}
+			},
+			[findQuery]
+		);
+
+		const closeFind = useCallback(() => {
+			setFindOpen(false);
+			setFindQuery('');
+		}, []);
 
 		const navigateToAddress = useCallback(
 			(rawValue: string) => {
@@ -550,7 +676,7 @@ export const BrowserTabView = React.memo(
 
 				<div
 					ref={hostRef}
-					className="flex-1 min-h-0 overflow-hidden"
+					className="relative flex-1 min-h-0 overflow-hidden"
 					data-testid="browser-tab-host"
 				>
 					<webview
@@ -561,6 +687,101 @@ export const BrowserTabView = React.memo(
 						partition={tab.partition}
 						src={tab.url || DEFAULT_BROWSER_TAB_URL}
 					/>
+					{findOpen ? (
+						<div
+							className="absolute top-2 right-3 z-10 flex items-center gap-1 rounded-md border px-2 py-1 shadow-md"
+							style={{
+								backgroundColor: theme.colors.bgMain,
+								borderColor: theme.colors.border,
+							}}
+							data-testid="browser-tab-find-bar"
+							role="search"
+						>
+							<input
+								ref={findInputRef}
+								type="text"
+								aria-label="Find in page"
+								value={findQuery}
+								onChange={(event) => setFindQuery(event.target.value)}
+								onKeyDown={(event) => {
+									if (event.key === 'Escape') {
+										event.preventDefault();
+										event.stopPropagation();
+										closeFind();
+									} else if (event.key === 'Enter') {
+										event.preventDefault();
+										event.stopPropagation();
+										handleFindNext(!event.shiftKey);
+									} else if (
+										event.key === 'g' &&
+										(event.metaKey || event.ctrlKey) &&
+										!event.altKey
+									) {
+										// Cmd+G / Cmd+Shift+G — next/prev match (standard browser shortcut)
+										event.preventDefault();
+										event.stopPropagation();
+										handleFindNext(!event.shiftKey);
+									} else if (
+										event.key === 'f' &&
+										(event.metaKey || event.ctrlKey) &&
+										!event.altKey &&
+										!event.shiftKey
+									) {
+										// Cmd+F while find bar is open — re-focus and select the query
+										event.preventDefault();
+										event.stopPropagation();
+										event.currentTarget.select();
+									}
+								}}
+								className="bg-transparent outline-none text-sm min-w-[180px]"
+								style={{ color: theme.colors.textMain }}
+								placeholder="Find in page"
+							/>
+							<span
+								className="text-xs tabular-nums px-1"
+								style={{ color: theme.colors.textDim }}
+								aria-live="polite"
+							>
+								{findQuery.length === 0
+									? ''
+									: findMatches.total === 0
+										? '0/0'
+										: `${findMatches.active}/${findMatches.total}`}
+							</span>
+							<button
+								type="button"
+								onClick={() => handleFindNext(false)}
+								disabled={findMatches.total === 0}
+								className="flex items-center justify-center w-6 h-6 rounded transition-colors disabled:opacity-40"
+								style={{ color: theme.colors.textMain }}
+								title="Previous match (Shift+Enter)"
+								aria-label="Previous match"
+							>
+								<ChevronUp className="w-4 h-4" />
+							</button>
+							<button
+								type="button"
+								onClick={() => handleFindNext(true)}
+								disabled={findMatches.total === 0}
+								className="flex items-center justify-center w-6 h-6 rounded transition-colors disabled:opacity-40"
+								style={{ color: theme.colors.textMain }}
+								title="Next match (Enter)"
+								aria-label="Next match"
+							>
+								<ChevronDown className="w-4 h-4" />
+							</button>
+							<button
+								type="button"
+								onClick={closeFind}
+								className="flex items-center justify-center w-6 h-6 rounded transition-colors"
+								style={{ color: theme.colors.textMain }}
+								title="Close (Esc)"
+								aria-label="Close find bar"
+							>
+								<X className="w-4 h-4" />
+							</button>
+						</div>
+					) : null}
 				</div>
 			</div>
 		);

@@ -155,6 +155,26 @@ function FileExplorerPanelInner(props: FileExplorerPanelProps) {
 		overscan: 10,
 	});
 
+	// Re-sync the virtualizer when the Files tab becomes visible (or the tree
+	// repopulates). The panel is kept mounted under `display:none` so the
+	// auto-refresh timer survives tab switches (see RightPanel), but while hidden
+	// the scroll element measures 0×0 and the still-running auto-refresh rebuilds
+	// the tree — changing row count/sizes and clamping scrollTop without emitting
+	// a scroll event. TanStack only updates its internal scrollOffset on a real
+	// scroll event, so on show the offset can be stale, painting a blank gap at
+	// the top until the user scrolls. Forcing a measure + offset re-sync repaints
+	// the correct window immediately.
+	useEffect(() => {
+		if (activeRightTab !== 'files') return;
+		const el = parentRef.current;
+		if (!el) return;
+		const raf = requestAnimationFrame(() => {
+			virtualizer.measure();
+			virtualizer.scrollToOffset(el.scrollTop);
+		});
+		return () => cancelAnimationFrame(raf);
+	}, [activeRightTab, flattenedTree.length, virtualizer]);
+
 	// ── Filter ────────────────────────────────────────────────────────────────
 
 	useFileTreeFilter({

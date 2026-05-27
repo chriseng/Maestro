@@ -385,6 +385,11 @@ export const PipelineCanvas = React.memo(function PipelineCanvas({
 				// H/P toggle so box-select can't sneak through.
 				panOnDrag={isLocked || interactionMode === 'hand' ? true : [1, 2]}
 				selectionOnDrag={interactionMode === 'pointer' && !isReadOnly && !isLocked}
+				// Hold Shift to temporarily pan the canvas with left-drag,
+				// regardless of the H/P mode. Overrides ReactFlow's default
+				// of Space (which conflicts with text input in drawers and
+				// is non-obvious for a graph canvas).
+				panActivationKeyCode="Shift"
 				// Hide the "React Flow" attribution badge in the bottom-right.
 				proOptions={REACT_FLOW_PRO_OPTIONS}
 				style={reactFlowStyle}
@@ -449,7 +454,7 @@ export const PipelineCanvas = React.memo(function PipelineCanvas({
 						{
 							mode: 'pointer' as const,
 							Icon: MousePointer2,
-							title: 'Select — left-drag for bounding box (S)',
+							title: 'Select — left-drag for bounding box (S). Hold Shift to pan.',
 						},
 					] satisfies {
 						mode: CanvasInteractionMode;

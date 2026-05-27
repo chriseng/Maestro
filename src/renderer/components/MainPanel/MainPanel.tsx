@@ -363,15 +363,22 @@ export const MainPanel = React.memo(
 					}
 				},
 				focusBrowserAddressBar: () => {
-					if (activeSession?.activeBrowserTabId) {
-						const input = document.getElementById(
-							`browser-tab-address-${activeSession.activeBrowserTabId}`
-						) as HTMLInputElement | null;
-						if (input) {
-							input.focus();
-							input.select();
-						}
-					}
+					// Read fresh from the store: `useImperativeHandle` only rebuilds when
+					// session ID changes, so opening a browser tab inside an existing
+					// session leaves `activeBrowserTabId` stale in the captured closure.
+					const session = selectActiveSession(useSessionStore.getState());
+					if (!session?.activeBrowserTabId) return;
+					const input = document.getElementById(
+						`browser-tab-address-${session.activeBrowserTabId}`
+					) as HTMLInputElement | null;
+					input?.focus();
+					input?.select();
+				},
+				openBrowserFind: () => {
+					// Same fresh-from-store reasoning as `focusBrowserAddressBar`.
+					const session = selectActiveSession(useSessionStore.getState());
+					if (!session?.activeBrowserTabId) return;
+					browserViewRef.current?.openFind();
 				},
 				focusActiveTab: () => {
 					// Read fresh from the store: useImperativeHandle only rebuilds when
@@ -408,22 +415,22 @@ export const MainPanel = React.memo(
 					tabElement.focus({ preventScroll: true });
 				},
 				reloadBrowserTab: () => {
-					if (activeSession?.activeBrowserTabId) {
-						const host = document.querySelector('[data-testid="browser-tab-host"]');
-						const webview = host?.querySelector('webview') as
-							| (HTMLElement & { reload: () => void; stop: () => void; isLoading: () => boolean })
-							| null;
-						if (webview) {
-							try {
-								if (webview.isLoading()) {
-									webview.stop();
-								} else {
-									webview.reload();
-								}
-							} catch {
-								// webview not ready
-							}
+					// Same stale-closure caveat as `focusBrowserAddressBar` — read fresh.
+					const session = selectActiveSession(useSessionStore.getState());
+					if (!session?.activeBrowserTabId) return;
+					const host = document.querySelector('[data-testid="browser-tab-host"]');
+					const webview = host?.querySelector('webview') as
+						| (HTMLElement & { reload: () => void; stop: () => void; isLoading: () => boolean })
+						| null;
+					if (!webview) return;
+					try {
+						if (webview.isLoading()) {
+							webview.stop();
+						} else {
+							webview.reload();
 						}
+					} catch {
+						// webview not ready
 					}
 				},
 				openTerminalSearch: () => {

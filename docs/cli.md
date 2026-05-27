@@ -305,9 +305,9 @@ JSON shape:
 
 Error codes: `MISSING_TAB_ID`, `TAB_NOT_FOUND`, `INVALID_OPTION`, `MAESTRO_NOT_RUNNING`, `COMMAND_FAILED`. All errors are emitted as `{ "success": false, "error": "...", "code": "..." }` with exit code `1`.
 
-### Creating and Removing Agents
+### Creating, Updating, and Removing Agents
 
-Create agents directly from the command line. Requires the Maestro desktop app to be running.
+Create, mutate, or delete agents directly from the command line. Requires the Maestro desktop app to be running.
 
 ```bash
 # Create a Claude Code agent with a working directory
@@ -338,7 +338,27 @@ maestro-cli create-agent "Full Config" -d /workspace \
 
 # Remove an agent
 maestro-cli remove-agent <agent-id>
+
+# Move an agent into a group (use "none" to ungroup)
+maestro-cli update-agent <agent-id> --group <group-id>
+maestro-cli update-agent <agent-id> --group none
+
+# Change an agent's working directory (refused while the agent process is running)
+maestro-cli update-agent <agent-id> --cwd /new/path/to/project
+
+# Combine both in a single call
+maestro-cli update-agent <agent-id> --group <group-id> --cwd /new/path
 ```
+
+`update-agent` mutates an existing agent in place. The group update reuses the same write path as drag-and-drop in the Left Bar. The cwd update only moves the UI-facing working directory (`cwd`/`fullPath`) — `projectRoot` is preserved so historical provider sessions stay addressable, which keeps prior conversation history attached when you relocate an archived project folder. Stop the agent before changing its cwd; the underlying PTY's working directory is fixed at spawn time, so the renderer refuses the update while the process is alive and surfaces the reason on stderr.
+
+| Flag               | Description                                                                           | Default |
+| ------------------ | ------------------------------------------------------------------------------------- | ------- |
+| `-g, --group <id>` | Move the agent to this group; supports partial IDs. Use `none` (or `null`) to ungroup | —       |
+| `-d, --cwd <path>` | New working directory (resolved to absolute). Agent must be stopped                   | —       |
+| `--json`           | Machine-readable JSON output                                                          | —       |
+
+The flag table below covers `create-agent`:
 
 | Flag                              | Description                                              | Default                    |
 | --------------------------------- | -------------------------------------------------------- | -------------------------- |

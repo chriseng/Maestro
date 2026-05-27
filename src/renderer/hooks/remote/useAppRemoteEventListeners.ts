@@ -1065,6 +1065,36 @@ export function useAppRemoteEventListeners(deps: UseAppRemoteEventListenersDeps)
 		});
 	});
 
+	// Handle remote update session cwd from CLI/web. Mutates the UI-facing
+	// cwd/fullPath only; projectRoot is intentionally preserved so historical
+	// provider sessions (stored under the original project root) remain
+	// addressable. The PTY's cwd is fixed at spawn time, so we refuse the
+	// update when an agent process is alive.
+	useEventListener('maestro:remoteUpdateSessionCwd', (e: Event) => {
+		const { sessionId, newCwd, responseChannel } = (e as CustomEvent).detail;
+		const session = sessionsRef.current.find((s) => s.id === sessionId);
+		if (!session) {
+			window.maestro.process.sendRemoteUpdateSessionCwdResponse(responseChannel, {
+				success: false,
+				error: 'Agent not found',
+			});
+			return;
+		}
+		if (session.aiPid && session.aiPid > 0) {
+			window.maestro.process.sendRemoteUpdateSessionCwdResponse(responseChannel, {
+				success: false,
+				error: 'Agent process is running; stop it before changing cwd',
+			});
+			return;
+		}
+		setSessions((prev: Session[]) =>
+			prev.map((s) =>
+				s.id === sessionId ? { ...s, cwd: newCwd, fullPath: newCwd, shellCwd: newCwd } : s
+			)
+		);
+		window.maestro.process.sendRemoteUpdateSessionCwdResponse(responseChannel, { success: true });
+	});
+
 	// Handle remote rename session from web interface
 	useEventListener('maestro:remoteRenameSession', (e: Event) => {
 		const { sessionId, newName, responseChannel } = (e as CustomEvent).detail;

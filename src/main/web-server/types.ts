@@ -760,6 +760,10 @@ export type CreateSessionCallback = (
 ) => Promise<{ sessionId: string } | null>;
 export type DeleteSessionCallback = (sessionId: string) => Promise<boolean>;
 export type RenameSessionCallback = (sessionId: string, newName: string) => Promise<boolean>;
+export type UpdateSessionCwdCallback = (
+	sessionId: string,
+	newCwd: string
+) => Promise<{ success: boolean; error?: string }>;
 export type GetAutoRunDocsCallback = (sessionId: string) => Promise<AutoRunDocument[]>;
 export type GetAutoRunDocContentCallback = (sessionId: string, filename: string) => Promise<string>;
 export type SaveAutoRunDocCallback = (

@@ -12,6 +12,8 @@ import {
 	ExternalLink,
 	Brain,
 	Megaphone,
+	Keyboard,
+	MousePointer2,
 } from 'lucide-react';
 import type { Theme } from '../types';
 import { formatShortcutKeys } from '../utils/shortcutFormatter';
@@ -1114,7 +1116,7 @@ export function CueHelpContent({ theme, cueShortcutKeys }: CueHelpContentProps) 
 					<Sparkles className="w-5 h-5" style={{ color: theme.colors.accent }} />
 					<h3 className="font-bold">Visual Pipeline Editor</h3>
 				</div>
-				<div className="text-sm space-y-2 pl-7" style={{ color: theme.colors.textDim }}>
+				<div className="text-sm space-y-3 pl-7" style={{ color: theme.colors.textDim }}>
 					<p>
 						The Pipeline Editor provides a visual canvas for building automation workflows. Drag
 						triggers and agents onto the canvas, connect them with edges, and organize them into
@@ -1128,8 +1130,128 @@ export function CueHelpContent({ theme, cueShortcutKeys }: CueHelpContentProps) 
 						from your sessions
 						<br />
 						<strong style={{ color: theme.colors.textMain }}>Pipeline selector:</strong> Create,
-						rename, and switch between pipelines
+						rename, and switch between pipelines. The{' '}
+						<strong style={{ color: theme.colors.textMain }}>All Pipelines</strong> view shows every
+						pipeline side-by-side and is read-only — switch back to a single pipeline to edit.
 					</p>
+
+					<div className="flex items-center gap-2 mt-4 mb-1">
+						<MousePointer2
+							className="w-4 h-4 flex-shrink-0"
+							style={{ color: theme.colors.accent }}
+						/>
+						<strong style={{ color: theme.colors.textMain }}>Canvas controls</strong>
+					</div>
+					<table className="w-full text-xs border-collapse">
+						<thead>
+							<tr>
+								<th
+									className="text-left py-1 px-2 border-b"
+									style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+								>
+									Action
+								</th>
+								<th
+									className="text-left py-1 px-2 border-b"
+									style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+								>
+									Behavior
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							{(
+								[
+									['Hand mode — left-drag', 'Pan the canvas'],
+									['Pointer mode — left-drag', 'Box-select nodes and edges'],
+									['Shift + left-drag (any mode)', 'Pan the canvas'],
+									['Middle / right-drag (any mode)', 'Pan the canvas'],
+									['Scroll wheel', 'Zoom in / out'],
+									['Drag from a node handle', 'Create a connection edge'],
+									['Right-click on a node', 'Open the node context menu'],
+									['Click a node or edge', 'Open its config panel'],
+									['Lock toggle', 'Disables drag, select, and connect'],
+								] as const
+							).map(([action, behavior], i) => (
+								<tr key={i}>
+									<td
+										className="py-1 px-2 border-b"
+										style={{ borderColor: theme.colors.border + '50' }}
+									>
+										{action}
+									</td>
+									<td
+										className="py-1 px-2 border-b"
+										style={{ borderColor: theme.colors.border + '50' }}
+									>
+										{behavior}
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+
+					<div className="flex items-center gap-2 mt-4 mb-1">
+						<Keyboard className="w-4 h-4 flex-shrink-0" style={{ color: theme.colors.accent }} />
+						<strong style={{ color: theme.colors.textMain }}>Keyboard shortcuts</strong>
+					</div>
+					<table className="w-full text-xs border-collapse">
+						<thead>
+							<tr>
+								<th
+									className="text-left py-1 px-2 border-b"
+									style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+								>
+									Key
+								</th>
+								<th
+									className="text-left py-1 px-2 border-b"
+									style={{ borderColor: theme.colors.border, color: theme.colors.textMain }}
+								>
+									Action
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							{(
+								[
+									['P', 'Switch to Hand (pan) mode'],
+									['S', 'Switch to Pointer (select) mode'],
+									['L', 'Toggle canvas lock'],
+									['F', 'Fit graph to viewport'],
+									['+ / =', 'Zoom in'],
+									['-', 'Zoom out'],
+									['Delete / Backspace', 'Delete the selected node or edge'],
+									['Escape', 'Close open drawer, then clear selection'],
+									['Cmd / Ctrl + S', 'Save the pipeline'],
+								] as const
+							).map(([key, action], i) => (
+								<tr key={i}>
+									<td
+										className="py-1 px-2 border-b"
+										style={{ borderColor: theme.colors.border + '50' }}
+									>
+										<kbd
+											className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold"
+											style={{
+												backgroundColor: theme.colors.bgActivity,
+												border: `1px solid ${theme.colors.border}`,
+											}}
+										>
+											{key}
+										</kbd>
+									</td>
+									<td
+										className="py-1 px-2 border-b"
+										style={{ borderColor: theme.colors.border + '50' }}
+									>
+										{action}
+									</td>
+								</tr>
+							))}
+						</tbody>
+					</table>
+
 					<div
 						className="flex items-center gap-2 px-3 py-2 rounded"
 						style={{ backgroundColor: theme.colors.accent + '15' }}

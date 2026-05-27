@@ -475,6 +475,13 @@ interface MaestroAPI {
 			callback: (sessionId: string, newName: string, responseChannel: string) => void
 		) => () => void;
 		sendRemoteRenameSessionResponse: (responseChannel: string, success: boolean) => void;
+		onRemoteUpdateSessionCwd: (
+			callback: (sessionId: string, newCwd: string, responseChannel: string) => void
+		) => () => void;
+		sendRemoteUpdateSessionCwdResponse: (
+			responseChannel: string,
+			result: { success: boolean; error?: string }
+		) => void;
 		onRemoteCreateGroup: (
 			callback: (name: string, emoji: string | undefined, responseChannel: string) => void
 		) => () => void;

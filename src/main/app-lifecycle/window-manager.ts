@@ -315,9 +315,11 @@ export function createWindowManager(deps: WindowManagerDependencies): WindowMana
 					if (!input.meta && !input.control && !input.alt) return;
 					if (input.type !== 'keyDown') return;
 					const k = input.key.toLowerCase();
-					// Let standard text-editing shortcuts pass through to the page
+					// Let standard text-editing shortcuts pass through to the page.
+					// `f` is intentionally NOT in this list: Cmd+F must reach the
+					// renderer so the in-page find bar can open.
 					const isTextEditing =
-						(input.meta || input.control) && !input.alt && !input.shift && 'acvxzf'.includes(k);
+						(input.meta || input.control) && !input.alt && !input.shift && 'acvxz'.includes(k);
 					const isRedo = (input.meta || input.control) && !input.alt && input.shift && k === 'z';
 					if (isTextEditing || isRedo) return;
 					event.preventDefault();
@@ -342,7 +344,7 @@ export function createWindowManager(deps: WindowManagerDependencies): WindowMana
 						var hasAlt=e.altKey;
 						if(!hasMod&&!hasAlt)return;
 						var k=e.key.toLowerCase();
-						var te=hasMod&&!hasAlt&&!e.shiftKey&&'acvxzf'.indexOf(k)!==-1;
+						var te=hasMod&&!hasAlt&&!e.shiftKey&&'acvxz'.indexOf(k)!==-1;
 						var re=hasMod&&!hasAlt&&e.shiftKey&&k==='z';
 						if(te||re)return;
 						e.preventDefault();

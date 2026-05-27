@@ -32,6 +32,7 @@ import {
 } from './commands/cue-pipeline';
 import { createAgent } from './commands/create-agent';
 import { removeAgent } from './commands/remove-agent';
+import { updateAgent } from './commands/update-agent';
 import { listSshRemotes } from './commands/list-ssh-remotes';
 import { createSshRemote } from './commands/create-ssh-remote';
 import { removeSshRemote } from './commands/remove-ssh-remote';
@@ -404,6 +405,23 @@ program
 	.description('Remove an agent from the Maestro desktop app')
 	.option('--json', 'Output as JSON (for scripting)')
 	.action(removeAgent);
+
+// Update agent command - mutate an existing agent's group and/or working
+// directory in place. Pass `--group none` to ungroup. Cwd updates are
+// refused while the agent process is alive (PTY cwd is fixed at spawn time).
+program
+	.command('update-agent <agent-id>')
+	.description("Update an existing agent's group and/or working directory")
+	.option(
+		'-g, --group <id>',
+		'Move the agent to this group (use "none" to ungroup; supports partial IDs)'
+	)
+	.option(
+		'-d, --cwd <path>',
+		"Change the agent's working directory (resolved to absolute; agent must be stopped)"
+	)
+	.option('--json', 'Output as JSON (for scripting)')
+	.action(updateAgent);
 
 // Create SSH remote command - add a new SSH remote configuration
 program

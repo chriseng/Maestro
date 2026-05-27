@@ -3041,5 +3041,99 @@ describe('useMainKeyboardHandler', () => {
 			unmount();
 			expect(ipcCallback).toBeNull();
 		});
+
+		it('routes forwarded Cmd+L to focusBrowserAddressBar without re-dispatching', () => {
+			let ipcCallback: ((input: Record<string, unknown>) => void) | null = null;
+			(window as any).maestro = {
+				...(window as any).maestro,
+				app: {
+					...((window as any).maestro?.app ?? {}),
+					onBrowserTabShortcutKey: (cb: (input: Record<string, unknown>) => void) => {
+						ipcCallback = cb;
+						return () => {
+							ipcCallback = null;
+						};
+					},
+				},
+			};
+
+			const { result } = renderHook(() => useMainKeyboardHandler());
+			const focusBrowserAddressBar = vi.fn();
+			const openBrowserFind = vi.fn();
+			result.current.keyboardHandlerRef.current = createMockContext({
+				activeSession: { id: 's1', activeBrowserTabId: 'b1' },
+				isTabShortcut: (_e: unknown, id: string) => id === 'focusBrowserAddress',
+				mainPanelRef: { current: { focusBrowserAddressBar, openBrowserFind } },
+			});
+
+			const dispatched: KeyboardEvent[] = [];
+			const listener = (e: Event) => dispatched.push(e as KeyboardEvent);
+			originalAddEventListener.call(window, 'keydown', listener);
+
+			act(() => {
+				ipcCallback!({
+					key: 'l',
+					code: 'KeyL',
+					meta: true,
+					control: false,
+					alt: false,
+					shift: false,
+				});
+			});
+
+			originalRemoveEventListener.call(window, 'keydown', listener);
+
+			expect(focusBrowserAddressBar).toHaveBeenCalledTimes(1);
+			expect(openBrowserFind).not.toHaveBeenCalled();
+			// Must NOT re-dispatch — that's what made the older implementation race
+			// with the overlay guard.
+			expect(dispatched.find((e) => e.key === 'l' && e.metaKey)).toBeUndefined();
+		});
+
+		it('routes forwarded Cmd+F to openBrowserFind', () => {
+			let ipcCallback: ((input: Record<string, unknown>) => void) | null = null;
+			(window as any).maestro = {
+				...(window as any).maestro,
+				app: {
+					...((window as any).maestro?.app ?? {}),
+					onBrowserTabShortcutKey: (cb: (input: Record<string, unknown>) => void) => {
+						ipcCallback = cb;
+						return () => {
+							ipcCallback = null;
+						};
+					},
+				},
+			};
+
+			const { result } = renderHook(() => useMainKeyboardHandler());
+			const openBrowserFind = vi.fn();
+			const focusBrowserAddressBar = vi.fn();
+			result.current.keyboardHandlerRef.current = createMockContext({
+				activeSession: { id: 's1', activeBrowserTabId: 'b1' },
+				isTabShortcut: () => false,
+				mainPanelRef: { current: { focusBrowserAddressBar, openBrowserFind } },
+			});
+
+			const dispatched: KeyboardEvent[] = [];
+			const listener = (e: Event) => dispatched.push(e as KeyboardEvent);
+			originalAddEventListener.call(window, 'keydown', listener);
+
+			act(() => {
+				ipcCallback!({
+					key: 'f',
+					code: 'KeyF',
+					meta: true,
+					control: false,
+					alt: false,
+					shift: false,
+				});
+			});
+
+			originalRemoveEventListener.call(window, 'keydown', listener);
+
+			expect(openBrowserFind).toHaveBeenCalledTimes(1);
+			expect(focusBrowserAddressBar).not.toHaveBeenCalled();
+			expect(dispatched.find((e) => e.key === 'f' && e.metaKey)).toBeUndefined();
+		});
 	});
 });

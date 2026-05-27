@@ -79,19 +79,22 @@ export const AGENT_TILES: AgentTile[] = [
 		description: "GitHub's AI coding assistant",
 		brandColor: '#24292F', // GitHub dark gray
 	},
-	// Coming soon agents at the bottom
-	{
-		id: 'gemini-cli',
-		name: 'Gemini CLI',
-		supported: false,
-		description: 'Coming soon',
-		brandColor: '#4285F4', // Google blue
-	},
 ];
 
 // Grid dimensions for keyboard navigation
 const GRID_COLS = 3;
 const GRID_ROWS = Math.ceil(AGENT_TILES.length / GRID_COLS);
+
+// Centering for a partial last row. The grid renders on a 6-track layout where
+// each tile spans 2 tracks (visually 3 columns). When the final row isn't full,
+// the leftover tiles are nudged inward so they sit centered under the full rows.
+// Tailwind needs literal class names (no string interpolation) for JIT, so the
+// col-start values are mapped explicitly.
+const TILES_IN_LAST_ROW = AGENT_TILES.length % GRID_COLS; // 0 means the last row is full
+const LAST_ROW_START_INDEX = TILES_IN_LAST_ROW === 0 ? -1 : AGENT_TILES.length - TILES_IN_LAST_ROW;
+// 1 tile  -> centered in tracks 3-4 (col-start-3); 2 tiles -> tracks 2-5 (col-start-2).
+const LAST_ROW_COL_START_CLASS =
+	TILES_IN_LAST_ROW === 1 ? 'col-start-3' : TILES_IN_LAST_ROW === 2 ? 'col-start-2' : '';
 
 /**
  * Get SVG logo for an agent with brand colors
@@ -147,24 +150,6 @@ export function AgentLogo({
 					{/* OpenAI hexagon-inspired logo */}
 					<path d="M24 6L40 15v18l-16 9-16-9V15l16-9z" stroke={color} strokeWidth="2" fill="none" />
 					<path d="M24 6v36M40 15L8 33M8 15l32 18" stroke={color} strokeWidth="2" />
-				</svg>
-			);
-
-		case 'gemini-cli':
-			// Gemini - Google's sparkle/star logo
-			return (
-				<svg
-					className="w-12 h-12"
-					viewBox="0 0 48 48"
-					fill="none"
-					xmlns="http://www.w3.org/2000/svg"
-					style={{ opacity }}
-				>
-					{/* Gemini sparkle logo */}
-					<path
-						d="M24 4C24 4 24 20 24 24C24 28 4 24 4 24C4 24 20 24 24 24C28 24 24 44 24 44C24 44 24 28 24 24C24 20 44 24 44 24C44 24 28 24 24 24"
-						fill={color}
-					/>
 				</svg>
 			);
 
@@ -1147,9 +1132,15 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
 					<p className="text-sm" style={{ color: theme.colors.textDim }}>
 						Select the provider that will power your agent.
 					</p>
-					<div className="grid grid-cols-3 gap-4 max-w-3xl">
+					<div className="grid grid-cols-6 gap-4 max-w-3xl">
 						{AGENT_TILES.map((tile, index) => {
 							const isDetected = isAgentAvailable(tile.id);
+							// Each tile spans 2 of 6 tracks (= 3 visual columns); the first tile of a
+							// partial last row gets a col-start offset so the row is centered.
+							const colSpanClass =
+								index === LAST_ROW_START_INDEX
+									? `col-span-2 ${LAST_ROW_COL_START_CLASS}`
+									: 'col-span-2';
 							const isSupported = tile.supported;
 							const canSelect = isSupported && isDetected;
 							const isSelected = state.selectedAgent === tile.id;
@@ -1170,6 +1161,7 @@ export function AgentSelectionScreen({ theme }: AgentSelectionScreenProps): JSX.
 									className={`
                     relative flex flex-col items-center justify-center pt-6 px-6 pb-10 rounded-xl
                     border-2 transition-all duration-200 outline-none min-w-[160px]
+                    ${colSpanClass}
                     ${canSelect ? 'cursor-pointer' : 'cursor-not-allowed'}
                   `}
 									style={{

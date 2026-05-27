@@ -280,6 +280,10 @@ export interface MessageHandlerCallbacks {
 	) => Promise<{ sessionId: string } | null>;
 	deleteSession: (sessionId: string) => Promise<boolean>;
 	renameSession: (sessionId: string, newName: string) => Promise<boolean>;
+	updateSessionCwd: (
+		sessionId: string,
+		newCwd: string
+	) => Promise<{ success: boolean; error?: string }>;
 	getGitStatus: (sessionId: string) => Promise<GitStatusResult>;
 	getGitDiff: (sessionId: string, filePath?: string) => Promise<GitDiffResult>;
 	getGitBranchesForSession: (sessionId: string) => Promise<GitBranchesResult>;
@@ -576,6 +580,10 @@ export class WebSocketMessageHandler {
 
 			case 'rename_session':
 				this.handleRenameSession(client, message);
+				break;
+
+			case 'update_session_cwd':
+				this.handleUpdateSessionCwd(client, message);
 				break;
 
 			case 'get_groups':
@@ -2914,6 +2922,49 @@ export class WebSocketMessageHandler {
 			})
 			.catch((error) => {
 				this.sendError(client, `Failed to rename session: ${error.message}`);
+			});
+	}
+
+	/**
+	 * Handle update_session_cwd message - update an agent's working directory.
+	 * The desktop's `projectRoot` (used for provider session storage) is left
+	 * untouched so historical conversations stay addressable; only the UI-facing
+	 * `cwd`/`fullPath` move. Renderer-side validation rejects updates while an
+	 * agent process is alive — the PTY's cwd is fixed at spawn time.
+	 */
+	private handleUpdateSessionCwd(client: WebClient, message: WebClientMessage): void {
+		const sessionId = message.sessionId as string;
+		const newCwd = message.newCwd as string;
+
+		if (!sessionId) {
+			this.sendError(client, 'Missing sessionId');
+			return;
+		}
+
+		if (!newCwd || typeof newCwd !== 'string' || newCwd.trim() === '') {
+			this.sendError(client, 'Missing or empty newCwd');
+			return;
+		}
+
+		if (!this.callbacks.updateSessionCwd) {
+			this.sendError(client, 'Session cwd updates not configured');
+			return;
+		}
+
+		this.callbacks
+			.updateSessionCwd(sessionId, newCwd)
+			.then((result) => {
+				this.send(client, {
+					type: 'update_session_cwd_result',
+					success: result.success,
+					error: result.error,
+					sessionId,
+					newCwd,
+					requestId: message.requestId,
+				});
+			})
+			.catch((error) => {
+				this.sendError(client, `Failed to update session cwd: ${error.message}`);
 			});
 	}
 
