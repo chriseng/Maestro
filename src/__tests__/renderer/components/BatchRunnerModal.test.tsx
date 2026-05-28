@@ -2639,17 +2639,111 @@ describe('Auto Run Fresh-Context Mode Auto-Selection', () => {
 	it('defaults to Task mode for smaller context windows (< 1M tokens)', async () => {
 		await setupSessionWithContextWindow(200_000);
 
-		render(<BatchRunnerModal {...createDefaultProps()} />);
+		// Use a task count >= 20 so the task-count-based recommendation
+		// agrees with the small-context-window default of Task. (Below 20
+		// tasks/doc the recommendation flips to Document — covered separately.)
+		const props = createDefaultProps();
+		props.getDocumentTaskCount = vi.fn().mockResolvedValue(25);
+
+		render(<BatchRunnerModal {...props} />);
 
 		await waitFor(() => {
-			expect(screen.getByText('5')).toBeInTheDocument();
+			expect(screen.getByText('25')).toBeInTheDocument();
 		});
 
-		// Task is the baseline default; assert it stays selected and is not flipped
-		// to Document for a sub-threshold window.
 		await waitFor(() => {
 			expect(screen.getByRole('button', { name: 'Task' })).toHaveClass('ring-2');
 		});
 		expect(screen.getByRole('button', { name: 'Document' })).not.toHaveClass('ring-2');
+	});
+
+	it('auto-applies Document mode when avg tasks/doc is below the recommendation threshold', async () => {
+		// 200K window → tasks/doc threshold = 5. 3 tasks/doc is below it.
+		// Small window would normally lean Task; task-count flips to Document.
+		await setupSessionWithContextWindow(200_000);
+
+		const props = createDefaultProps();
+		props.getDocumentTaskCount = vi.fn().mockResolvedValue(3);
+
+		render(<BatchRunnerModal {...props} />);
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Document' })).toHaveClass('ring-2');
+		});
+		expect(screen.getByRole('button', { name: 'Task' })).not.toHaveClass('ring-2');
+	});
+
+	it('auto-applies Task mode when avg tasks/doc meets the recommendation threshold', async () => {
+		// 1M window → tasks/doc threshold = 20. 25 tasks/doc is at/above it.
+		// Large window would normally lean Document; task-count flips to Task.
+		await setupSessionWithContextWindow(1_000_000);
+
+		const props = createDefaultProps();
+		props.getDocumentTaskCount = vi.fn().mockResolvedValue(25);
+
+		render(<BatchRunnerModal {...props} />);
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Task' })).toHaveClass('ring-2');
+		});
+		expect(screen.getByRole('button', { name: 'Document' })).not.toHaveClass('ring-2');
+	});
+
+	it('scales the tasks/doc threshold with the context window', async () => {
+		// 10 tasks/doc straddles the threshold:
+		//   - At 200K (threshold 5) → 10 ≥ 5 → Task
+		//   - At 1M   (threshold 20) → 10 < 20 → Document
+		// Verifies the threshold actually scales rather than being fixed.
+		await setupSessionWithContextWindow(1_000_000);
+
+		const props = createDefaultProps();
+		props.getDocumentTaskCount = vi.fn().mockResolvedValue(10);
+
+		render(<BatchRunnerModal {...props} />);
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Document' })).toHaveClass('ring-2');
+		});
+	});
+
+	it('shows a recommendation warning when the user manually picks the non-recommended mode', async () => {
+		await setupSessionWithContextWindow(200_000);
+
+		const props = createDefaultProps();
+		props.getDocumentTaskCount = vi.fn().mockResolvedValue(3);
+
+		render(<BatchRunnerModal {...props} />);
+
+		// Wait for the auto-applied Document recommendation to settle.
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Document' })).toHaveClass('ring-2');
+		});
+
+		// User overrides to Task — recommendation now disagrees, warning shows.
+		fireEvent.click(screen.getByRole('button', { name: 'Task' }));
+
+		await waitFor(() => {
+			expect(screen.getByText(/Heads up/)).toBeInTheDocument();
+		});
+		expect(screen.getByText(/better fit/)).toBeInTheDocument();
+	});
+
+	it('hides the recommendation warning when the user agrees with the recommendation', async () => {
+		await setupSessionWithContextWindow(200_000);
+
+		const props = createDefaultProps();
+		props.getDocumentTaskCount = vi.fn().mockResolvedValue(3);
+
+		render(<BatchRunnerModal {...props} />);
+
+		await waitFor(() => {
+			expect(screen.getByRole('button', { name: 'Document' })).toHaveClass('ring-2');
+		});
+
+		// Clicking the already-selected recommended option flips the override
+		// flag but the mode still matches the recommendation, so no warning.
+		fireEvent.click(screen.getByRole('button', { name: 'Document' }));
+
+		expect(screen.queryByText(/Heads up/)).not.toBeInTheDocument();
 	});
 });

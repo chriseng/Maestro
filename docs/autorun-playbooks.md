@@ -85,7 +85,7 @@ The run configuration modal has a **Fresh context per** toggle that controls how
 - Best for agents with very large context windows, and for work where later tasks build on earlier ones.
 - Requires enough context window to hold a whole document's worth of work in one session.
 
-**Auto-selection:** Maestro picks the mode from the running agent's context window — **Document** at 1M tokens or more (e.g. Claude's 1M window), **Task** below that. You can override it per run, and a loaded Playbook's saved mode always takes precedence.
+**Auto-selection:** Maestro picks the mode by combining the running agent's context window with the average task count across the documents you've selected. The tasks-per-doc threshold scales with the window — **5** at 256K or less, **10** at 512K, **20** at 1M — and below the threshold Maestro recommends **Document**, at/above it **Task**. Selecting different documents recomputes the recommendation. If you toggle to the non-recommended mode, the modal surfaces a small note explaining what it would have picked and why, but respects your choice. A loaded Playbook's saved mode always takes precedence, and once you've manually toggled, future document-selection changes don't yank the mode back.
 
 > **Tip:** Author tasks to be self-contained regardless of mode. Document mode is an optimization, not a license to write tasks that depend on chat memory.
 

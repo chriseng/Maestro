@@ -50,6 +50,17 @@ import { PER_DOCUMENT_CONTEXT_THRESHOLD } from '../../shared/agentConstants';
 // Re-export for external consumers
 export { DEFAULT_BATCH_PROMPT, validateAgentPromptHasTaskReference } from '../hooks';
 
+// Tasks-per-document threshold that flips the recommendation between
+// Document mode (below the threshold — share context) and Task mode
+// (at/above — fresh context per task). Scales linearly with the agent's
+// resolved context window so wider windows can absorb more tasks before
+// the recommendation tips over. Reference anchors: 256K → 5, 512K → 10,
+// 1M → 20. Floors at 5 so tiny windows still get a sensible default.
+function computeTasksPerDocThreshold(contextWindow: number): number {
+	if (!contextWindow || contextWindow <= 0) return 5;
+	return Math.max(5, Math.round((contextWindow / 256_000) * 5));
+}
+
 interface BatchRunnerModalProps {
 	theme: Theme;
 	onClose: () => void;
@@ -223,6 +234,14 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 	// every task in a single invocation, sharing context across them.
 	const [taskSelectionMode, setTaskSelectionMode] = useState<TaskSelectionMode>('task');
 	const initialTaskSelectionModeRef = useRef<TaskSelectionMode>('task');
+	// Set true when the user explicitly clicks the toggle. Sticky: once the
+	// user has expressed a preference we stop auto-applying recommendations and
+	// instead surface a warning if the recommendation disagrees.
+	const [userOverrodeMode, setUserOverrodeMode] = useState(false);
+	// Resolved context window for the active agent. Drives the tasks/doc
+	// threshold that recommendedMode uses. Null until the resolver finishes
+	// (or there's no active session) — recommendations wait for it.
+	const [effectiveContextWindow, setEffectiveContextWindow] = useState<number | null>(null);
 
 	// Prompt state
 	const [prompt, setPrompt] = useState(initialPrompt || DEFAULT_BATCH_PROMPT);
@@ -354,9 +373,13 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 				0
 			);
 			const contextWindow = Math.max(configured, reported);
+			if (!active) return;
+			// Expose the resolved window so the task-count recommendation can
+			// scale its tasks/doc threshold (5 at 256K → 20 at 1M).
+			setEffectiveContextWindow(contextWindow);
 			// Re-check via refs: a playbook may have loaded (or the auto-pick may
 			// have already run) while the agent config IPC was in flight.
-			if (!active || autoModeAppliedRef.current || loadedPlaybookRef.current) return;
+			if (autoModeAppliedRef.current || loadedPlaybookRef.current) return;
 			const mode: TaskSelectionMode =
 				contextWindow >= PER_DOCUMENT_CONTEXT_THRESHOLD ? 'document' : 'task';
 			autoModeAppliedRef.current = true;
@@ -432,6 +455,56 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 
 	// Count missing documents for warning display
 	const missingDocCount = documents.filter((doc) => doc.isMissing).length;
+
+	// Recommend a fresh-context mode based on average tasks per selected doc,
+	// using a threshold that scales with the agent's resolved context window.
+	// Small docs benefit from a shared agent across tasks (less spawn overhead,
+	// no repeated context priming); large docs do better with a fresh context
+	// per task so tool output from earlier tasks doesn't crowd later ones.
+	const tasksPerDocThreshold = useMemo(
+		() =>
+			effectiveContextWindow === null ? null : computeTasksPerDocThreshold(effectiveContextWindow),
+		[effectiveContextWindow]
+	);
+	const recommendedMode = useMemo<TaskSelectionMode | null>(() => {
+		// Wait for the context window resolver — its value drives the threshold.
+		if (tasksPerDocThreshold === null) return null;
+		const validDocs = documents.filter((d) => !d.isMissing);
+		if (validDocs.length === 0) return null;
+		// Wait until at least one selected doc has a task count loaded —
+		// recommending against zeros would lock us into 'document' on first paint.
+		const knownCounts = validDocs
+			.map((d) => taskCounts[d.filename])
+			.filter((n): n is number => typeof n === 'number');
+		if (knownCounts.length === 0) return null;
+		const avg = knownCounts.reduce((a, b) => a + b, 0) / knownCounts.length;
+		return avg < tasksPerDocThreshold ? 'document' : 'task';
+	}, [documents, taskCounts, tasksPerDocThreshold]);
+
+	// Auto-apply the task-count recommendation when documents/counts change.
+	// Skips if a playbook is loaded (it owns the mode) or the user has
+	// manually overridden — once they've picked, we respect it and warn
+	// instead of fighting them.
+	useEffect(() => {
+		if (userOverrodeMode) return;
+		if (loadedPlaybook) return;
+		if (recommendedMode === null) return;
+		if (recommendedMode === taskSelectionMode) return;
+		setTaskSelectionMode(recommendedMode);
+		// Keep the dirty check honest: an automatic mode shift shouldn't
+		// mark the form as having unsaved changes.
+		initialTaskSelectionModeRef.current = recommendedMode;
+	}, [recommendedMode, loadedPlaybook, userOverrodeMode, taskSelectionMode]);
+
+	// Wrapped setter for the toggle: any manual click flips the override flag
+	// so future doc-selection changes don't yank the mode back.
+	const handleTaskSelectionModeChange = useCallback((mode: TaskSelectionMode) => {
+		setUserOverrodeMode(true);
+		setTaskSelectionMode(mode);
+	}, []);
+
+	const showRecommendationWarning =
+		userOverrodeMode && recommendedMode !== null && recommendedMode !== taskSelectionMode;
 
 	// Validate agent prompt has task references
 	const hasValidPrompt = validateAgentPromptHasTaskReference(prompt);
@@ -773,6 +846,45 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 
 					{/* Agent Prompt Section */}
 					<div className="flex flex-col gap-2">
+						{/* Fresh-context-per selector — drives {{TASK_SELECTION_BLOCK}} */}
+						<div className="mb-2">
+							<div
+								className="text-[10px] font-bold uppercase mb-1.5"
+								style={{ color: theme.colors.textDim }}
+							>
+								Fresh context per:
+							</div>
+							<p className="text-[10px] mb-1.5" style={{ color: theme.colors.textDim }}>
+								Controls how agent context is scoped while walking your documents. The right choice
+								depends on the type of document: for huge documents — or tasks that pile up a lot of
+								tool output — pick <strong>Task</strong> so each task gets a clean context. For
+								smaller documents where later tasks benefit from earlier work, pick{' '}
+								<strong>Document</strong> so a single agent shares context across every task. See
+								the in-app help and documentation for the full breakdown.
+							</p>
+							<ToggleButtonGroup<TaskSelectionMode>
+								options={[
+									{ value: 'task', label: 'Task' },
+									{ value: 'document', label: 'Document' },
+								]}
+								value={taskSelectionMode}
+								onChange={handleTaskSelectionModeChange}
+								theme={theme}
+							/>
+							<p className="text-[10px] mt-1.5" style={{ color: theme.colors.textDim }}>
+								{taskSelectionMode === 'task'
+									? 'A new agent is spawned for each unchecked task — clean context every time.'
+									: 'A single agent walks every unchecked task in the document, sharing context across them.'}
+							</p>
+							{showRecommendationWarning && (
+								<p className="text-[10px] mt-1.5" style={{ color: theme.colors.warning }}>
+									Heads up — based on the task count across your selected documents, we think{' '}
+									<strong>{recommendedMode === 'task' ? 'Task' : 'Document'}</strong> is probably
+									the better fit here. If you know what you&apos;re doing, go for it.
+								</p>
+							)}
+						</div>
+
 						<div className="flex items-center justify-between">
 							<div className="flex items-center gap-3">
 								<label
@@ -811,30 +923,6 @@ export function BatchRunnerModal(props: BatchRunnerModalProps) {
 									Last modified {formatLastModified(lastModifiedAt)}.
 								</span>
 							)}
-						</div>
-
-						{/* Fresh-context-per selector — drives {{TASK_SELECTION_BLOCK}} */}
-						<div className="mb-2">
-							<div
-								className="text-[10px] font-bold uppercase mb-1.5"
-								style={{ color: theme.colors.textDim }}
-							>
-								Fresh context per:
-							</div>
-							<ToggleButtonGroup<TaskSelectionMode>
-								options={[
-									{ value: 'task', label: 'Task' },
-									{ value: 'document', label: 'Document' },
-								]}
-								value={taskSelectionMode}
-								onChange={setTaskSelectionMode}
-								theme={theme}
-							/>
-							<p className="text-[10px] mt-1.5" style={{ color: theme.colors.textDim }}>
-								{taskSelectionMode === 'task'
-									? 'A new agent is spawned for each unchecked task — clean context every time.'
-									: 'A single agent walks every unchecked task in the document, sharing context across them.'}
-							</p>
 						</div>
 
 						{/* Template Variables Documentation */}
