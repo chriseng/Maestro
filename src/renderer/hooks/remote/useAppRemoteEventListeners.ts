@@ -1021,6 +1021,20 @@ export function useAppRemoteEventListeners(deps: UseAppRemoteEventListenersDeps)
 				isRemote: false,
 			});
 
+			// Persist the new agent to disk synchronously before responding. The
+			// renderer's debounced persistence path (useDebouncedPersistence) is
+			// driven by React render cycles and a 2s timer, so a CLI consumer that
+			// runs `create-agent` and then immediately `list agents` / `send` would
+			// otherwise hit the disk-backed CLI storage layer before the in-memory
+			// session has been flushed — surfacing as `AGENT_NOT_FOUND` (issue #1013).
+			// `setMany` is incremental and idempotent: the debounced flush that
+			// follows simply rewrites the same row.
+			try {
+				await window.maestro.sessions.setMany([newSession], []);
+			} catch (persistErr) {
+				logger.error('[Remote] Failed to persist new CLI-created session:', undefined, persistErr);
+			}
+
 			window.maestro.process.sendRemoteCreateSessionResponse(responseChannel, {
 				sessionId: newId,
 			});
