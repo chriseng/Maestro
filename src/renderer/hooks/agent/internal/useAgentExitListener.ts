@@ -43,6 +43,7 @@ export interface UseAgentExitListenerDeps {
 	addHistoryEntryRef: UseAgentListenersDeps['addHistoryEntryRef'];
 	spawnBackgroundSynopsisRef: UseAgentListenersDeps['spawnBackgroundSynopsisRef'];
 	rightPanelRef: UseAgentListenersDeps['rightPanelRef'];
+	batchedUpdater: UseAgentListenersDeps['batchedUpdater'];
 	activeHiddenToolRef: React.RefObject<
 		Map<string, { toolName: string; toolState?: ToolProgressState }>
 	>;
@@ -548,6 +549,11 @@ export function useAgentExitListener(deps: UseAgentExitListenerDeps): void {
 			}
 
 			if (queuedItemToProcess) {
+				// Flush any pending batched stdout/stderr chunks before the queued
+				// message is dispatched. Otherwise the new user log entry is appended
+				// ahead of the trailing chunks from the response that just finished,
+				// and those chunks merge into the next response's bubble (issue #1022).
+				deps.batchedUpdater.flushNow();
 				setTimeout(() => {
 					deps.processQueuedItemRef.current?.(
 						queuedItemToProcess!.sessionId,
