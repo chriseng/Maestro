@@ -74,6 +74,7 @@ import {
 import {
 	clearCodexUsageSnapshots,
 	getAllCodexUsageSnapshots,
+	resolveCodexHomeKey,
 	__resetForTests as resetCodexUsageStore,
 	type CodexUsageSnapshot,
 } from '../../../main/stores/codexUsageStore';
@@ -135,6 +136,33 @@ describe('codex-usage-startup → discoverCodexHomes', () => {
 		captureExceptionMock.mockReset();
 	});
 
+	it('returns no homes for recoverable home directory read failures', async () => {
+		const denied = Object.assign(new Error('denied'), { code: 'EACCES' });
+		const readdirSpy = vi.spyOn(fs.promises, 'readdir').mockRejectedValue(denied);
+
+		try {
+			await expect(discoverCodexHomes('/Users/test')).resolves.toEqual([]);
+			expect(captureExceptionMock).not.toHaveBeenCalled();
+		} finally {
+			readdirSpy.mockRestore();
+		}
+	});
+
+	it('reports and rethrows unexpected home directory read failures', async () => {
+		const unexpected = Object.assign(new Error('disk failure'), { code: 'EIO' });
+		const readdirSpy = vi.spyOn(fs.promises, 'readdir').mockRejectedValue(unexpected);
+
+		try {
+			await expect(discoverCodexHomes('/Users/test')).rejects.toThrow('disk failure');
+			expect(captureExceptionMock).toHaveBeenCalledWith(unexpected, {
+				operation: 'codexUsage:discoverCodexHomes.readdir',
+				homeDir: '/Users/test',
+			});
+		} finally {
+			readdirSpy.mockRestore();
+		}
+	});
+
 	it('skips homes with missing or unreadable auth.json files', async () => {
 		const readdirSpy = vi
 			.spyOn(fs.promises, 'readdir')
@@ -182,6 +210,12 @@ describe('codex-usage-startup → discoverCodexHomes', () => {
 			readdirSpy.mockRestore();
 			accessSpy.mockRestore();
 		}
+	});
+});
+
+describe('codexUsageStore → resolveCodexHomeKey', () => {
+	it('falls back to the default CODEX_HOME for an empty env value', () => {
+		expect(resolveCodexHomeKey({ CODEX_HOME: '' })).toBe('/Users/test/.codex');
 	});
 });
 

@@ -34,6 +34,7 @@ interface SamplingTarget {
 
 const ACCOUNT_DIR_EXCLUDE_RE =
 	/(^|[-_.])(backup|bak|old|archive|archived|stage|local|server)([-_.]|$)/i;
+const RECOVERABLE_DISCOVERY_ERROR_CODES = new Set(['ENOENT', 'EACCES', 'ENOTDIR']);
 const RECOVERABLE_SAMPLE_ERROR_CODES = new Set([
 	'ENOENT',
 	'EACCES',
@@ -70,6 +71,14 @@ export async function discoverCodexHomes(homeDir = os.homedir()): Promise<string
 	try {
 		entries = await fs.promises.readdir(homeDir, { withFileTypes: true });
 	} catch (err) {
+		const code = getErrorCode(err);
+		if (!code || !RECOVERABLE_DISCOVERY_ERROR_CODES.has(code)) {
+			void captureException(err, {
+				operation: 'codexUsage:discoverCodexHomes.readdir',
+				homeDir,
+			});
+			throw err;
+		}
 		logger.warn('Failed to discover Codex homes', LOG_CONTEXT, {
 			homeDir,
 			error: err instanceof Error ? err.message : String(err),

@@ -101,7 +101,10 @@ export function clearCodexUsageSnapshots(): void {
 }
 
 export function resolveCodexHomeKey(env: NodeJS.ProcessEnv): string {
-	const raw = env.CODEX_HOME ?? path.join(os.homedir(), '.codex');
+	const raw =
+		typeof env.CODEX_HOME === 'string' && env.CODEX_HOME.length > 0
+			? env.CODEX_HOME
+			: path.join(os.homedir(), '.codex');
 	return path.resolve(raw);
 }
 
