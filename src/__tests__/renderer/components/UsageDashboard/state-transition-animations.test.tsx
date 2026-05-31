@@ -148,6 +148,15 @@ beforeEach(() => {
 		stats: mockStats,
 		dialog: mockDialog,
 		fs: mockFs,
+		// Usage snapshot samplers fired by the dashboard's quota-on-open effect.
+		// Without these the effect throws on `window.maestro.agents` and leaks an
+		// unhandled rejection.
+		agents: {
+			refreshClaudeUsageSnapshots: vi.fn().mockResolvedValue({ refreshed: 0 }),
+			refreshCodexUsageSnapshots: vi.fn().mockResolvedValue({ refreshed: 0 }),
+			getClaudeUsageSnapshots: vi.fn().mockResolvedValue({}),
+			getCodexUsageSnapshots: vi.fn().mockResolvedValue({}),
+		},
 		// Minimum surface needed by `useGlobalAgentStats` (called from the
 		// dashboard's Achievement share image flow).
 		agentSessions: {
