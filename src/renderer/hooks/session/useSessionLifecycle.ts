@@ -414,6 +414,10 @@ export function useSessionLifecycle(deps: SessionLifecycleDeps): SessionLifecycl
 				agentType: activeSession.toolType,
 				cwd: activeSession.cwd,
 				sessionSshRemoteConfig: activeSession.sessionSshRemoteConfig,
+				// Honor the agent's Claude token source for the naming spawn.
+				enableMaestroP: activeSession.enableMaestroP,
+				maestroPMode: activeSession.maestroPMode,
+				maestroPPath: activeSession.maestroPPath,
 			})
 			.then((generatedName) => {
 				useSessionStore.getState().setSessions((prev) =>
