@@ -49,6 +49,18 @@ import {
 // reads as the same 25px. Bump this to widen the grid.
 const NODE_GAP = 25;
 
+// The ArrowClosed marker at a target handle consumes ~16px of the edge line
+// (18px when the edge is selected; see markerEnd in PipelineEdge.tsx). The
+// source/target handle centers sit ON the node edges, so a horizontal edge
+// spans exactly the COLUMN gap - subtract the arrowhead and the plain visible
+// line is the leftover. To guarantee at least NODE_GAP (25px) of straight line
+// BEFORE the arrowhead, the horizontal column gap must be NODE_GAP plus this
+// allowance. Vertical spacing needs no allowance (edges run horizontally).
+const ARROWHEAD_ALLOWANCE = 20;
+// Horizontal clear space between columns. Wider than NODE_GAP so the arrowhead
+// has room and >=25px of line still shows before it.
+const COLUMN_GAP = NODE_GAP + ARROWHEAD_ALLOWANCE;
+
 // Real rendered node heights by type (the wrapper height each node component
 // sets). The connection handle on every node sits at its VERTICAL CENTER
 // (ReactFlow's default `top: 50%`), so to make an edge between two nodes a
@@ -377,15 +389,16 @@ function arrangeByColumns(
 		banded.push({ byRank });
 	}
 
-	// Column x-origins: cumulative left edges. Each column starts NODE_GAP past
-	// the right edge of the widest node in the previous column, so there is ALWAYS
-	// at least 25px of clear space between columns no matter how wide a node is.
-	// A chain of N ranks therefore yields N distinct, non-overlapping columns.
+	// Column x-origins: cumulative left edges. Each column starts COLUMN_GAP past
+	// the right edge of the widest node in the previous column. COLUMN_GAP leaves
+	// room for the target's arrowhead AND >=25px of visible straight line before
+	// it, no matter how wide a node is. A chain of N ranks therefore yields N
+	// distinct, non-overlapping columns.
 	const columnX = new Map<number, number>();
 	let x = 0;
 	for (const r of [...maxWidthByRank.keys()].sort((a, b) => a - b)) {
 		columnX.set(r, x);
-		x += (maxWidthByRank.get(r) ?? NODE_BG_WIDTH) + NODE_GAP;
+		x += (maxWidthByRank.get(r) ?? NODE_BG_WIDTH) + COLUMN_GAP;
 	}
 
 	const arranged: PipelineNode[] = [];

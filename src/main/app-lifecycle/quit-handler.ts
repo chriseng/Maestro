@@ -25,6 +25,21 @@ import { powerManager as powerManagerInstance } from '../power-manager';
  */
 const QUIT_CONFIRMATION_TIMEOUT_MS = 5000;
 
+/**
+ * Grace window between running cleanup and hard-exiting via app.exit() on a
+ * normal user quit.
+ *
+ * After performCleanup() the only work left is fire-and-forget (telemetry POST,
+ * the tunnel's SIGTERM->exit, web-server socket close). The critical teardown
+ * (PTY SIGKILL, stats DB close) already ran synchronously. We let those tails
+ * make progress for this long, then call app.exit() to bypass Electron's native
+ * Node-environment teardown — which can deadlock on native addon finalizers
+ * (e.g. node-pty ThreadSafeFunctions, MAESTRO-3B) and leave the process alive
+ * forever, forcing the user to kill it manually. Kept short so quit still feels
+ * instant; the trade is a sub-second delay for a guaranteed exit.
+ */
+const FORCE_EXIT_GRACE_MS = 750;
+
 /** Dependencies for quit handler */
 export interface QuitHandlerDependencies {
 	/** Function to get the main window */
@@ -61,6 +76,15 @@ interface QuitHandlerState {
 	isRequestingConfirmation: boolean;
 	/** Safety timeout for quit confirmation — forces quit if renderer never responds */
 	confirmationTimeout: ReturnType<typeof setTimeout> | null;
+	/**
+	 * Whether this quit is the auto-updater installing an update. On that path we
+	 * must let Electron's graceful will-quit/quit teardown run so electron-updater
+	 * can apply the update (Squirrel.Mac install-on-quit, the Windows NSIS handoff).
+	 * The force-exit fallback is skipped when this is set.
+	 */
+	installingUpdate: boolean;
+	/** Guards against re-entrant before-quit running cleanup / arming the timer twice. */
+	cleanupStarted: boolean;
 }
 
 /** Quit handler instance */
@@ -106,6 +130,8 @@ export function createQuitHandler(deps: QuitHandlerDependencies): QuitHandler {
 		quitConfirmed: false,
 		isRequestingConfirmation: false,
 		confirmationTimeout: null,
+		installingUpdate: false,
+		cleanupStarted: false,
 	};
 
 	return {
@@ -175,8 +201,30 @@ export function createQuitHandler(deps: QuitHandlerDependencies): QuitHandler {
 					return;
 				}
 
-				// Quit confirmed - proceed with cleanup (async operations are fire-and-forget)
+				// Quit confirmed. Guard against a re-entrant before-quit (e.g. another
+				// path calling app.quit() during the grace window) running cleanup or
+				// arming the timer twice.
+				if (state.cleanupStarted) {
+					return;
+				}
+				state.cleanupStarted = true;
+
+				// Proceed with cleanup (async operations are fire-and-forget).
 				performCleanup();
+
+				// On the update-install path, let Electron's graceful teardown run so
+				// electron-updater can apply the update. Otherwise, take control of the
+				// exit: hold the event loop open (preventDefault) and hard-exit via
+				// app.exit() after a short grace window. This dodges the native
+				// Node-environment teardown that can deadlock on native addon
+				// finalizers and hang the process forever (see FORCE_EXIT_GRACE_MS).
+				if (!state.installingUpdate) {
+					event.preventDefault();
+					setTimeout(() => {
+						logger.info('Force-exiting after cleanup grace window', 'Shutdown');
+						app.exit(0);
+					}, FORCE_EXIT_GRACE_MS);
+				}
 			});
 		},
 
@@ -185,6 +233,12 @@ export function createQuitHandler(deps: QuitHandlerDependencies): QuitHandler {
 		confirmQuit: () => {
 			clearConfirmationTimeout();
 			state.quitConfirmed = true;
+			// confirmQuit() is only invoked from the auto-updater's
+			// onBeforeQuitAndInstall hook (the renderer's user-quit path goes through
+			// the 'app:quitConfirmed' IPC handler instead). Mark this so the
+			// before-quit handler skips the force-exit and lets the updater apply the
+			// update via the graceful will-quit/quit teardown.
+			state.installingUpdate = true;
 		},
 	};
 

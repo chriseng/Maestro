@@ -17,6 +17,7 @@ const ipcHandlers = new Map<string, (...args: unknown[]) => void>();
 
 // Mock app
 const mockQuit = vi.fn();
+const mockExit = vi.fn();
 const mockAppOn = vi.fn((event: string, handler: (e: { preventDefault: () => void }) => void) => {
 	if (event === 'before-quit') {
 		beforeQuitHandler = handler;
@@ -32,6 +33,7 @@ vi.mock('electron', () => ({
 	app: {
 		on: (...args: unknown[]) => mockAppOn(...args),
 		quit: () => mockQuit(),
+		exit: (...args: unknown[]) => mockExit(...args),
 	},
 	ipcMain: {
 		on: (...args: unknown[]) => mockIpcMainOn(...args),
@@ -288,18 +290,25 @@ describe('app-lifecycle/quit-handler', () => {
 			expect(mockQuit).toHaveBeenCalled();
 		});
 
-		it('should perform cleanup when quit is confirmed', async () => {
+		it('should perform cleanup on the update-install path without force-exiting', async () => {
+			vi.useFakeTimers();
 			const { createQuitHandler } = await import('../../../main/app-lifecycle/quit-handler');
 
 			const quitHandler = createQuitHandler(deps as Parameters<typeof createQuitHandler>[0]);
 			quitHandler.setup();
+			// confirmQuit() is the auto-updater path — graceful teardown must proceed
+			// so electron-updater can apply the update.
 			quitHandler.confirmQuit();
 
 			const mockEvent = { preventDefault: vi.fn() };
 			beforeQuitHandler!(mockEvent);
 
-			// Should not prevent default when confirmed
+			// On the update path we must NOT hold the loop open or hard-exit, so the
+			// native will-quit/quit teardown can run the installer handoff.
 			expect(mockEvent.preventDefault).not.toHaveBeenCalled();
+			vi.advanceTimersByTime(60_000);
+			expect(mockExit).not.toHaveBeenCalled();
+			vi.useRealTimers();
 
 			// Should perform cleanup
 			expect(mockHistoryManager.stopWatching).toHaveBeenCalled();
@@ -468,6 +477,57 @@ describe('app-lifecycle/quit-handler', () => {
 
 			// Should not throw
 			expect(() => beforeQuitHandler!(mockEvent)).not.toThrow();
+		});
+
+		it('should hold the loop open and hard-exit after the grace window on a user quit', async () => {
+			vi.useFakeTimers();
+			const { createQuitHandler } = await import('../../../main/app-lifecycle/quit-handler');
+
+			const quitHandler = createQuitHandler(deps as Parameters<typeof createQuitHandler>[0]);
+			quitHandler.setup();
+
+			// User-quit path: renderer confirms via the IPC handler (NOT confirmQuit,
+			// which is reserved for the auto-updater). This sets quitConfirmed=true
+			// and calls app.quit(), which re-emits before-quit.
+			ipcHandlers.get('app:quitConfirmed')!();
+
+			const mockEvent = { preventDefault: vi.fn() };
+			beforeQuitHandler!(mockEvent);
+
+			// Cleanup ran...
+			expect(mockHistoryManager.stopWatching).toHaveBeenCalled();
+			expect(mockProcessManager.killAll).toHaveBeenCalled();
+			// ...the loop is held open so the watchdog timer can fire...
+			expect(mockEvent.preventDefault).toHaveBeenCalled();
+			expect(mockExit).not.toHaveBeenCalled();
+
+			// ...and after the grace window we hard-exit, bypassing native teardown.
+			vi.advanceTimersByTime(750);
+			expect(mockExit).toHaveBeenCalledWith(0);
+
+			vi.useRealTimers();
+		});
+
+		it('should not run cleanup or arm the timer twice on a re-entrant before-quit', async () => {
+			vi.useFakeTimers();
+			const { createQuitHandler } = await import('../../../main/app-lifecycle/quit-handler');
+
+			const quitHandler = createQuitHandler(deps as Parameters<typeof createQuitHandler>[0]);
+			quitHandler.setup();
+			ipcHandlers.get('app:quitConfirmed')!();
+
+			beforeQuitHandler!({ preventDefault: vi.fn() });
+			// A second before-quit emit (e.g. another path calling app.quit) must be a no-op.
+			beforeQuitHandler!({ preventDefault: vi.fn() });
+
+			expect(mockHistoryManager.stopWatching).toHaveBeenCalledTimes(1);
+			expect(mockProcessManager.killAll).toHaveBeenCalledTimes(1);
+
+			vi.advanceTimersByTime(750);
+			// Only one timer was armed despite two emits.
+			expect(mockExit).toHaveBeenCalledTimes(1);
+
+			vi.useRealTimers();
 		});
 	});
 

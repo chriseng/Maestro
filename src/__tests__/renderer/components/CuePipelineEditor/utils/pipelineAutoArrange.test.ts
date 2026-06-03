@@ -59,6 +59,12 @@ function centerY(pos: { y: number }, type: 'trigger' | 'agent'): number {
 	return pos.y + (type === 'trigger' ? TRIGGER_H : AGENT_H) / 2;
 }
 
+// Horizontal gap between columns (mirror pipelineAutoArrange): NODE_GAP plus an
+// arrowhead allowance so >=25px of straight line shows before the target arrow.
+const NODE_GAP = 25;
+const ARROWHEAD_ALLOWANCE = 20;
+const COLUMN_GAP = NODE_GAP + ARROWHEAD_ALLOWANCE;
+
 describe('arrangePipelineNodes', () => {
 	it('returns nodes unchanged when there is 0 or 1 node', () => {
 		const empty = pipeline();
@@ -82,10 +88,10 @@ describe('arrangePipelineNodes', () => {
 		expect(byId.get('a1')!.x).toBeLessThan(byId.get('a2')!.x);
 	});
 
-	it('snaps a chain onto a grid: exactly 25px of clear space between columns', () => {
-		// Every column pitch = node footprint + 25px gap, so the orthogonal edge
-		// bridging two nodes is exactly 25px and the whole chain reads as one grid.
-		const GAP = 25;
+	it('snaps a chain onto a grid: COLUMN_GAP of clear space between columns', () => {
+		// Every column pitch = node footprint + COLUMN_GAP, leaving room for the
+		// arrowhead plus >=25px of visible straight line, and the chain reads as
+		// one grid.
 		const p = pipeline({
 			nodes: [triggerNode('t', 0, 0), agentNode('a1', 0, 0), agentNode('a2', 0, 0)],
 			edges: [
@@ -94,10 +100,10 @@ describe('arrangePipelineNodes', () => {
 			],
 		});
 		const byId = new Map(arrangePipelineNodes(p).map((n) => [n.id, n.position]));
-		// Gap between a node's right edge and the next node's left edge is 25px.
+		// Gap between a node's right edge and the next node's left edge is COLUMN_GAP.
 		// (No measured widths passed → every node falls back to NODE_BG_WIDTH.)
-		expect(byId.get('a1')!.x - (byId.get('t')!.x + NODE_BG_WIDTH)).toBe(GAP);
-		expect(byId.get('a2')!.x - (byId.get('a1')!.x + NODE_BG_WIDTH)).toBe(GAP);
+		expect(byId.get('a1')!.x - (byId.get('t')!.x + NODE_BG_WIDTH)).toBe(COLUMN_GAP);
+		expect(byId.get('a2')!.x - (byId.get('a1')!.x + NODE_BG_WIDTH)).toBe(COLUMN_GAP);
 		// A linear chain stays on one row. Edges are dead-straight when the node
 		// CENTERS (where the handles are) share a y - the trigger is shorter than
 		// the agents, so its top-left sits lower to bring the centers level.
@@ -108,9 +114,8 @@ describe('arrangePipelineNodes', () => {
 	it('spaces columns from MEASURED widths so a wide node never overruns the next column', () => {
 		// Repro of the cramped 3-node chain: a wide command/agent node at rank 1
 		// would, under a fixed column pitch, overlap the rank-2 node. With measured
-		// widths the rank-2 column starts 25px past the rank-1 node's real right
-		// edge, guaranteeing the gap and producing a real third column.
-		const GAP = 25;
+		// widths the rank-2 column starts COLUMN_GAP past the rank-1 node's real
+		// right edge, guaranteeing the gap and producing a real third column.
 		const p = pipeline({
 			nodes: [triggerNode('t', 0, 0), agentNode('mid', 0, 0), agentNode('end', 0, 0)],
 			edges: [
@@ -128,18 +133,17 @@ describe('arrangePipelineNodes', () => {
 		// Three distinct, strictly increasing columns.
 		expect(byId.get('t')!.x).toBeLessThan(byId.get('mid')!.x);
 		expect(byId.get('mid')!.x).toBeLessThan(byId.get('end')!.x);
-		// Column 1 (mid) starts 25px past the trigger's real 200px right edge.
-		expect(byId.get('mid')!.x - (byId.get('t')!.x + 200)).toBe(GAP);
-		// Column 2 (end) starts 25px past the WIDE mid node's real 560px right edge -
-		// this is the guarantee that was violated with a fixed pitch.
-		expect(byId.get('end')!.x - (byId.get('mid')!.x + 560)).toBe(GAP);
+		// Column 1 (mid) starts COLUMN_GAP past the trigger's real 200px right edge.
+		expect(byId.get('mid')!.x - (byId.get('t')!.x + 200)).toBe(COLUMN_GAP);
+		// Column 2 (end) starts COLUMN_GAP past the WIDE mid node's real 560px right
+		// edge - this is the guarantee that was violated with a fixed pitch.
+		expect(byId.get('end')!.x - (byId.get('mid')!.x + 560)).toBe(COLUMN_GAP);
 	});
 
 	it('aligns every component on ONE column grid sized by the widest node per rank', () => {
 		// Two independent chains. The rank-1 column must clear the WIDEST rank-0
 		// node across BOTH chains, so both chains' rank-1 nodes share an x and no
 		// trigger (however wide) overruns its target.
-		const GAP = 25;
 		const p = pipeline({
 			nodes: [
 				triggerNode('t1', 0, 0),
@@ -162,8 +166,8 @@ describe('arrangePipelineNodes', () => {
 		const byId = new Map(arrangePipelineNodes(p, widths).map((n) => [n.id, n.position]));
 		// Both chains' agents share the same column x (one global grid).
 		expect(byId.get('a1')!.x).toBe(byId.get('a2')!.x);
-		// That column clears the widest rank-0 node (t2 @ 420) by 25px.
-		expect(byId.get('a1')!.x - (0 + 420)).toBe(GAP);
+		// That column clears the widest rank-0 node (t2 @ 420) by COLUMN_GAP.
+		expect(byId.get('a1')!.x - (0 + 420)).toBe(COLUMN_GAP);
 	});
 
 	it('center-aligns a row and stacks columns with 25px between nodes', () => {
