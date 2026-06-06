@@ -41,6 +41,7 @@ import {
 	type SynopsisData,
 	type RunExitSynopsisDeps,
 } from './helpers/exitSynopsis';
+import { thinkingLogsRecorded } from './helpers/thinkingLogs';
 import { getAutorunSynopsisPrompt } from './helpers/autorunSynopsisPrompt';
 import type { LogEntry, QueuedItem, SessionState, UsageStats } from '../../../types';
 import type { UseAgentListenersDeps, ToolProgressState } from './types';
@@ -308,7 +309,8 @@ export function useAgentExitListener(deps: UseAgentExitListenerDeps): void {
 					if (shouldRunSynopsisOnExit(currentSession, completedTab)) {
 						synopsisDidWork = turnDidMeaningfulWork(
 							logs,
-							!!currentSession.pendingAICommandForSynopsis
+							!!currentSession.pendingAICommandForSynopsis,
+							thinkingLogsRecorded(completedTab?.showThinking)
 						);
 						synopsisData = {
 							sessionId: actualSessionId,

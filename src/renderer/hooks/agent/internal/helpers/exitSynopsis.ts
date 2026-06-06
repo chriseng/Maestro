@@ -248,12 +248,19 @@ export function shouldRunSynopsisOnExit(
  *
  * @param logs The completed tab's full log history.
  * @param isCustomCommand True when this exit was driven by a pending custom AI command.
+ * @param toolLogsObservable Whether this tab actually records tool logs. Tabs with
+ *   thinking display off never emit `source: 'tool'` entries (see
+ *   `thinkingLogsRecorded`), so the scan below cannot distinguish a genuine no-op
+ *   turn from a tool-heavy one. When false we record the turn rather than risk
+ *   silently dropping its History entry - the pre-activity-gate behavior.
  */
 export function turnDidMeaningfulWork(
 	logs: ReadonlyArray<{ source: LogEntry['source'] }>,
-	isCustomCommand = false
+	isCustomCommand = false,
+	toolLogsObservable = true
 ): boolean {
 	if (isCustomCommand) return true;
+	if (!toolLogsObservable) return true;
 	let lastUserIdx = -1;
 	for (let i = logs.length - 1; i >= 0; i--) {
 		if (logs[i].source === 'user') {

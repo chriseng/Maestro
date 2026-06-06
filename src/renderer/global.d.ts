@@ -3221,7 +3221,7 @@ interface MaestroAPI {
 	directorNotes: {
 		getUnifiedHistory: (options: {
 			lookbackDays: number;
-			filter?: 'AUTO' | 'USER' | 'CUE' | null;
+			filter?: 'AUTO' | 'USER' | 'CUE' | Array<'AUTO' | 'USER' | 'CUE'> | null;
 			limit?: number;
 			offset?: number;
 			graphBucketCount?: number;
@@ -3282,7 +3282,10 @@ interface MaestroAPI {
 		}>;
 		getOffsetForTimestamp: (
 			timestamp: number,
-			options?: { lookbackDays?: number; filter?: 'AUTO' | 'USER' | 'CUE' | null }
+			options?: {
+				lookbackDays?: number;
+				filter?: 'AUTO' | 'USER' | 'CUE' | Array<'AUTO' | 'USER' | 'CUE'> | null;
+			}
 		) => Promise<number>;
 		generateSynopsis: (options: {
 			lookbackDays: number;

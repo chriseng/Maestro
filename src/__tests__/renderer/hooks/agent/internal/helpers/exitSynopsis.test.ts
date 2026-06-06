@@ -165,6 +165,19 @@ describe('turnDidMeaningfulWork', () => {
 	it('returns false for an empty log buffer', () => {
 		expect(turnDidMeaningfulWork([])).toBe(false);
 	});
+
+	it('records the turn when tool logs are not observable (thinking off)', () => {
+		// Tabs with thinking off never emit `source: 'tool'` logs, so a tool-free
+		// buffer cannot prove the turn was idle - record it rather than drop the
+		// History entry.
+		const logs = [log('user'), log('ai')];
+		expect(turnDidMeaningfulWork(logs, false, false)).toBe(true);
+	});
+
+	it('still requires tool use when tool logs ARE observable (thinking on)', () => {
+		const logs = [log('user'), log('ai')];
+		expect(turnDidMeaningfulWork(logs, false, true)).toBe(false);
+	});
 });
 
 describe('runExitSynopsis', () => {

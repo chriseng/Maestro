@@ -51,8 +51,18 @@ vi.mock('fs', () => ({
 // Bridge fs/promises to the sync mocks above so test setup like
 // `mockReadFileSync.mockReturnValue(...)` still drives the async code path
 // in history-manager.
+//
+// history-manager now writes session files via `atomicWriteJson` (write to
+// `${file}.tmp`, then `rename` over the target). We model that atomicity here
+// so the existing assertions, which expect `writeFileSync` to be called with
+// the FINAL path and content, keep firing unchanged: `.tmp` writes are
+// buffered, and `rename` commits the buffered payload as a single
+// `writeFileSync(finalPath, data)`. Direct, non-`.tmp` writes (the migration
+// marker) flush immediately. `rename` on a real (non-buffered) path is the
+// corrupt-file backup move, which no assertion inspects, so it is a no-op.
 vi.mock('fs/promises', async () => {
 	const fs = await import('fs');
+	const pendingTmpWrites = new Map<string, string>();
 	return {
 		access: vi.fn(async (p: string) => {
 			if (!(fs as { existsSync: (p: string) => boolean }).existsSync(p)) {
@@ -67,13 +77,28 @@ vi.mock('fs/promises', async () => {
 		readFile: vi.fn(async (p: string, enc?: string) =>
 			(fs as { readFileSync: (p: string, e?: string) => string }).readFileSync(p, enc)
 		),
-		writeFile: vi.fn(async (p: string, data: string, enc?: string) =>
+		writeFile: vi.fn(async (p: string, data: string, enc?: string) => {
+			if (p.endsWith('.tmp')) {
+				pendingTmpWrites.set(p, data);
+				return;
+			}
 			(fs as { writeFileSync: (p: string, d: string, e?: string) => void }).writeFileSync(
 				p,
 				data,
 				enc
-			)
-		),
+			);
+		}),
+		rename: vi.fn(async (from: string, to: string) => {
+			if (pendingTmpWrites.has(from)) {
+				const data = pendingTmpWrites.get(from)!;
+				pendingTmpWrites.delete(from);
+				(fs as { writeFileSync: (p: string, d: string, e?: string) => void }).writeFileSync(
+					to,
+					data,
+					'utf-8'
+				);
+			}
+		}),
 		readdir: vi.fn(async (p: string) =>
 			(fs as { readdirSync: (p: string) => string[] }).readdirSync(p)
 		),
