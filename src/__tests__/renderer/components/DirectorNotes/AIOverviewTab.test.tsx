@@ -362,6 +362,30 @@ describe('AIOverviewTab', () => {
 			expect(window.localStorage.getItem(FONT_SCALE_STORAGE_KEY)).toBe('0.9');
 		});
 
+		// Regression guard: the controls used to update state + localStorage but
+		// the rendered text never changed, because MarkdownRenderer's `.prose`
+		// root carries Tailwind `text-sm` (an absolute rem unit) that pinned the
+		// base size. The fix scales `.prose` directly via an injected style rule.
+		const proseFontRule = (): string | undefined =>
+			Array.from(document.querySelectorAll('style'))
+				.map((el) => el.textContent || '')
+				.find((css) => css.includes('.director-notes-content .prose'));
+
+		it('injects a scaled .prose font-size rule that tracks the current scale', async () => {
+			render(<AIOverviewTab theme={mockTheme} />);
+
+			await waitFor(() => {
+				expect(screen.getByTestId('markdown-renderer')).toBeInTheDocument();
+			});
+
+			// Default scale 1.0.
+			expect(proseFontRule()).toContain('font-size: calc(0.875rem * 1) !important');
+
+			fireEvent.click(screen.getByLabelText('Increase font size'));
+
+			expect(proseFontRule()).toContain('font-size: calc(0.875rem * 1.1) !important');
+		});
+
 		it('loads the persisted scale and disables increase at the max bound', async () => {
 			// Preload a scale at the clamp ceiling (FONT_SCALE_MAX = 2.0).
 			window.localStorage.setItem(FONT_SCALE_STORAGE_KEY, '2');

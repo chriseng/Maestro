@@ -113,8 +113,14 @@ export function AIOverviewTab({ theme, onSynopsisReady }: AIOverviewTabProps) {
 	}, []);
 	const isGeneratingRef = useRef(false);
 
-	// Generate prose styles for markdown rendering
-	const proseStyles = generateTerminalProseStyles(theme, '.director-notes-content');
+	// Generate prose styles for markdown rendering. MarkdownRenderer's root
+	// `.prose` carries Tailwind's `text-sm` (0.875rem, an absolute rem unit),
+	// which would otherwise pin the base font size and ignore the zoom control.
+	// Override it with a scaled size (same selector → higher specificity than the
+	// utility class) so the em-based prose children scale proportionally.
+	const proseStyles =
+		generateTerminalProseStyles(theme, '.director-notes-content') +
+		`\n.director-notes-content .prose { font-size: calc(0.875rem * ${fontScale}) !important; }`;
 
 	// Format generation duration for display
 	const formatDurationMs = (ms: number): string => {
@@ -427,7 +433,7 @@ export function AIOverviewTab({ theme, onSynopsisReady }: AIOverviewTabProps) {
 					</div>
 				)}
 				{synopsis ? (
-					<div className="director-notes-content" style={{ fontSize: `${fontScale}em` }}>
+					<div className="director-notes-content">
 						<style>{proseStyles}</style>
 						<MarkdownRenderer
 							content={synopsis}

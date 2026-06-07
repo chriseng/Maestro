@@ -1686,7 +1686,14 @@ export function getWriteModeTab(session: Session): AITab | undefined {
  * This is useful for the busy tab indicator which needs to show ALL busy tabs,
  * not just the first one found.
  *
+ * Pass `{ includeOrphans: true }` to also count closed-but-still-thinking tabs
+ * (those parked in `orphanedThinkingTabs`). Those tabs keep writing in the
+ * background after the user closes them, so any single-writer gate must treat
+ * them as live writers - excluding them lets a new write spawn concurrently with
+ * an orphan, violating single-writer-per-agent.
+ *
  * @param session - The Maestro session
+ * @param options.includeOrphans - Also include busy orphaned (closed) tabs
  * @returns Array of busy AITabs (empty if none are busy)
  *
  * @example
@@ -1698,12 +1705,16 @@ export function getWriteModeTab(session: Session): AITab | undefined {
  *   });
  * }
  */
-export function getBusyTabs(session: Session): AITab[] {
-	if (!session || !session.aiTabs || session.aiTabs.length === 0) {
+export function getBusyTabs(session: Session, options: { includeOrphans?: boolean } = {}): AITab[] {
+	if (!session) {
 		return [];
 	}
 
-	return session.aiTabs.filter((tab) => tab.state === 'busy');
+	const tabs = options.includeOrphans
+		? [...(session.aiTabs ?? []), ...(session.orphanedThinkingTabs ?? [])]
+		: (session.aiTabs ?? []);
+
+	return tabs.filter((tab) => tab.state === 'busy');
 }
 
 /**
