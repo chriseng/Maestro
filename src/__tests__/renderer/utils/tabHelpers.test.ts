@@ -1099,6 +1099,47 @@ describe('tabHelpers', () => {
 			expect(result).toContain(tab1);
 			expect(result).toContain(tab3);
 		});
+
+		it('ignores busy orphaned tabs by default', () => {
+			const tab1 = createMockTab({ id: 'tab-1', state: 'idle' });
+			const orphan = createMockTab({ id: 'orphan-1', state: 'busy' });
+			const session = createMockSession({
+				aiTabs: [tab1],
+				orphanedThinkingTabs: [orphan],
+			});
+
+			expect(getBusyTabs(session)).toEqual([]);
+		});
+
+		it('includes busy orphaned tabs when includeOrphans is set', () => {
+			const tab1 = createMockTab({ id: 'tab-1', state: 'idle' });
+			const orphan = createMockTab({ id: 'orphan-1', state: 'busy' });
+			const session = createMockSession({
+				aiTabs: [tab1],
+				orphanedThinkingTabs: [orphan],
+			});
+
+			const result = getBusyTabs(session, { includeOrphans: true });
+
+			expect(result).toHaveLength(1);
+			expect(result).toContain(orphan);
+		});
+
+		it('counts an orphan as a busy writer even when the fresh aiTab is idle', () => {
+			// Regression: Cmd+W on a running tab parks it in orphanedThinkingTabs and
+			// leaves a fresh idle aiTab. The orphan is still a live writer, so the
+			// single-writer gate must see it (otherwise a new write spawns concurrently).
+			const freshTab = createMockTab({ id: 'fresh', state: 'idle', readOnlyMode: false });
+			const orphan = createMockTab({ id: 'orphan-1', state: 'busy', readOnlyMode: false });
+			const session = createMockSession({
+				aiTabs: [freshTab],
+				orphanedThinkingTabs: [orphan],
+			});
+
+			const busy = getBusyTabs(session, { includeOrphans: true });
+			expect(busy).toHaveLength(1);
+			expect(busy.every((tab) => tab.readOnlyMode === true)).toBe(false);
+		});
 	});
 
 	describe('getNavigableTabs', () => {

@@ -163,6 +163,7 @@ function SessionListInner(props: SessionListProps) {
 	const draggingSessionId = useUIStore((s) => s.draggingSessionId);
 	const bookmarksCollapsed = useUIStore((s) => s.bookmarksCollapsed);
 	const groupChatsExpanded = useSettingsStore((s) => s.groupChatsExpanded);
+	const groupChatSortAlphabetical = useSettingsStore((s) => s.groupChatSortAlphabetical);
 	const shortcuts = useSettingsStore((s) => s.shortcuts);
 	const leftSidebarWidthState = useSettingsStore((s) => s.leftSidebarWidth);
 	const persistentWebLink = useSettingsStore((s) => s.persistentWebLink);
@@ -458,6 +459,7 @@ function SessionListInner(props: SessionListProps) {
 	const setLeftSidebarOpen = useUIStore.getState().setLeftSidebarOpen;
 	const setBookmarksCollapsed = useUIStore.getState().setBookmarksCollapsed;
 	const setGroupChatsExpanded = useSettingsStore.getState().setGroupChatsExpanded;
+	const setGroupChatSortAlphabetical = useSettingsStore.getState().setGroupChatSortAlphabetical;
 	const setActiveSessionIdRaw = useSessionStore.getState().setActiveSessionId;
 	const setActiveGroupChatId = useGroupChatStore.getState().setActiveGroupChatId;
 	const setActiveSessionId = useCallback(
@@ -1749,6 +1751,8 @@ function SessionListInner(props: SessionListProps) {
 								onDeleteAllArchivedGroupChats={onDeleteAllArchivedGroupChats}
 								isExpanded={groupChatsExpanded}
 								onExpandedChange={setGroupChatsExpanded}
+								sortAlphabetical={groupChatSortAlphabetical}
+								onSortAlphabeticalChange={setGroupChatSortAlphabetical}
 								groupChatState={groupChatState}
 								participantStates={participantStates}
 								groupChatStates={groupChatStates}
@@ -1852,14 +1856,6 @@ function SessionListInner(props: SessionListProps) {
 					group={groupContextMenuGroup}
 					memberCount={groupContextMenuMemberCount}
 					onRename={() => {
-						const modalActions = getModalActions();
-						modalActions.setRenameGroupId(groupContextMenuGroup.id);
-						modalActions.setRenameGroupValue(groupContextMenuGroup.name);
-						modalActions.setRenameGroupEmoji(groupContextMenuGroup.emoji);
-						modalActions.setRenameGroupModalOpen(true);
-					}}
-					onChangeEmoji={() => {
-						// Reuses the rename modal, which includes the emoji picker.
 						const modalActions = getModalActions();
 						modalActions.setRenameGroupId(groupContextMenuGroup.id);
 						modalActions.setRenameGroupValue(groupContextMenuGroup.name);

@@ -43,7 +43,7 @@ import {
 } from './helpers/exitSynopsis';
 import { thinkingLogsRecorded } from './helpers/thinkingLogs';
 import { getAutorunSynopsisPrompt } from './helpers/autorunSynopsisPrompt';
-import type { LogEntry, QueuedItem, SessionState, UsageStats } from '../../../types';
+import type { LogEntry, QueuedItem, Session, SessionState, UsageStats } from '../../../types';
 import type { UseAgentListenersDeps, ToolProgressState } from './types';
 
 export interface UseAgentExitListenerDeps {
@@ -435,13 +435,64 @@ export function useAgentExitListener(deps: UseAgentExitListenerDeps): void {
 							};
 						}
 
-						// No queued work for this orphan - retire it.
-						const updatedOrphans = s.orphanedThinkingTabs.filter((_, i) => i !== orphanIndex);
+						// This orphan has no queued work of its own, so it's done draining -
+						// retire it. But the queue may still hold a runnable item for ANOTHER
+						// tab that the post-reducer dispatch (queuedItemToProcess, decided above
+						// by chooseNextQueuedItem) is about to spawn. We MUST dequeue that exact
+						// item and mark its target busy here, in lockstep with that spawn.
+						// Otherwise it stays queued and re-dispatches when its own process later
+						// exits (the message runs twice), and no tab shows busy while it runs
+						// (an invisible turn whose reply never routes to a tab). Gating on
+						// queuedItemToProcess keeps the reducer and the spawn perfectly in sync.
+						const orphansWithoutExited = s.orphanedThinkingTabs.filter((_, i) => i !== orphanIndex);
+						const { item: nextRunnable, remaining: remainingAfterNext } = takeNextRunnableQueueItem(
+							s.executionQueue
+						);
+						const dispatchesNext =
+							!!queuedItemToProcess &&
+							!!nextRunnable &&
+							queuedItemToProcess.item.id === nextRunnable.id;
+
+						if (dispatchesNext && nextRunnable) {
+							// Resolve against the session WITHOUT the just-retired orphan so the
+							// target is the item's real owner (another aiTab or another
+							// still-draining orphan); we already know it isn't this orphan.
+							const sessionAfterRetire: Session = {
+								...s,
+								orphanedThinkingTabs: orphansWithoutExited,
+							};
+							const target = resolveQueuedItemTarget(sessionAfterRetire, nextRunnable);
+							if (target) {
+								return {
+									...s,
+									aiTabs: s.aiTabs.map((tab) =>
+										tab.id === target.tabId ? markTabRunningQueuedItem(tab, nextRunnable) : tab
+									),
+									orphanedThinkingTabs:
+										orphansWithoutExited.length > 0
+											? orphansWithoutExited.map((tab) =>
+													tab.id === target.tabId
+														? markTabRunningQueuedItem(tab, nextRunnable)
+														: tab
+												)
+											: undefined,
+									executionQueue: remainingAfterNext,
+									state: 'busy' as SessionState,
+									busySource: 'ai',
+									thinkingStartTime: Date.now(),
+									currentCycleTokens: 0,
+									currentCycleBytes: 0,
+								};
+							}
+						}
+
+						// Nothing to dispatch - retire the orphan and recompute thinking state.
 						const anyAiTabStillBusy = s.aiTabs?.some((tab) => tab.state === 'busy') ?? false;
-						const stillThinking = anyAiTabStillBusy || updatedOrphans.length > 0;
+						const stillThinking = anyAiTabStillBusy || orphansWithoutExited.length > 0;
 						return {
 							...s,
-							orphanedThinkingTabs: updatedOrphans.length > 0 ? updatedOrphans : undefined,
+							orphanedThinkingTabs:
+								orphansWithoutExited.length > 0 ? orphansWithoutExited : undefined,
 							state: stillThinking ? s.state : ('idle' as SessionState),
 							busySource: stillThinking ? s.busySource : undefined,
 							thinkingStartTime: stillThinking ? s.thinkingStartTime : undefined,

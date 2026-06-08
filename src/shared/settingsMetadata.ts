@@ -897,6 +897,13 @@ export const SETTINGS_METADATA: Record<string, SettingMetadata> = {
 		default: true,
 		category: 'onboarding',
 	},
+	groupChatSortAlphabetical: {
+		description:
+			'Sort group chats alphabetically (true) instead of by most recent activity (false).',
+		type: 'boolean',
+		default: false,
+		category: 'onboarding',
+	},
 	starredSessionsCollapsed: {
 		description: 'Whether the "Starred Sessions" section in the left bar is collapsed.',
 		type: 'boolean',

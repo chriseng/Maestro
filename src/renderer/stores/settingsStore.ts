@@ -355,6 +355,7 @@ export interface SettingsStoreState {
 	usageStats: MaestroUsageStats;
 	ungroupedCollapsed: boolean;
 	groupChatsExpanded: boolean;
+	groupChatSortAlphabetical: boolean;
 	starredSessionsCollapsed: boolean;
 	tourCompleted: boolean;
 	firstAutoRunCompleted: boolean;
@@ -497,6 +498,7 @@ export interface SettingsStoreActions {
 	setCustomAICommands: (value: CustomAICommand[]) => void;
 	setUngroupedCollapsed: (value: boolean) => void;
 	setGroupChatsExpanded: (value: boolean) => void;
+	setGroupChatSortAlphabetical: (value: boolean) => void;
 	setStarredSessionsCollapsed: (value: boolean) => void;
 	setTourCompleted: (value: boolean) => void;
 	setFirstAutoRunCompleted: (value: boolean) => void;
@@ -710,6 +712,7 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		usageStats: DEFAULT_USAGE_STATS,
 		ungroupedCollapsed: false,
 		groupChatsExpanded: true,
+		groupChatSortAlphabetical: false,
 		starredSessionsCollapsed: false,
 		tourCompleted: false,
 		firstAutoRunCompleted: false,
@@ -1054,6 +1057,11 @@ export const useSettingsStore = create<SettingsStore>()((set, get) => {
 		setGroupChatsExpanded: (value) => {
 			set({ groupChatsExpanded: value });
 			window.maestro.settings.set('groupChatsExpanded', value);
+		},
+
+		setGroupChatSortAlphabetical: (value) => {
+			set({ groupChatSortAlphabetical: value });
+			window.maestro.settings.set('groupChatSortAlphabetical', value);
 		},
 
 		setStarredSessionsCollapsed: (value) => {
@@ -2424,6 +2432,9 @@ export async function loadAllSettings(): Promise<void> {
 		if (allSettings['groupChatsExpanded'] !== undefined)
 			patch.groupChatsExpanded = allSettings['groupChatsExpanded'] as boolean;
 
+		if (allSettings['groupChatSortAlphabetical'] !== undefined)
+			patch.groupChatSortAlphabetical = allSettings['groupChatSortAlphabetical'] as boolean;
+
 		if (allSettings['starredSessionsCollapsed'] !== undefined)
 			patch.starredSessionsCollapsed = allSettings['starredSessionsCollapsed'] as boolean;
 
@@ -2902,6 +2913,7 @@ export function getSettingsActions() {
 		updateUsageStats: state.updateUsageStats,
 		setUngroupedCollapsed: state.setUngroupedCollapsed,
 		setGroupChatsExpanded: state.setGroupChatsExpanded,
+		setGroupChatSortAlphabetical: state.setGroupChatSortAlphabetical,
 		setStarredSessionsCollapsed: state.setStarredSessionsCollapsed,
 		setTourCompleted: state.setTourCompleted,
 		setFirstAutoRunCompleted: state.setFirstAutoRunCompleted,

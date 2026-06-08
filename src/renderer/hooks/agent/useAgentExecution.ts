@@ -8,6 +8,7 @@ import type {
 	ToolType,
 } from '../../types';
 import { getActiveTab, resolveQueuedItemTarget } from '../../utils/tabHelpers';
+import { filterYoloArgs } from '../../utils/agentArgs';
 import { getStdinFlags, prepareMaestroSystemPrompt } from '../../utils/spawnHelpers';
 import { generateId } from '../../utils/ids';
 import {
@@ -748,7 +749,14 @@ export function useAgentExecution(deps: UseAgentExecutionDeps): UseAgentExecutio
 							toolType,
 							cwd,
 							command: commandToUse,
-							args: agent.args || [],
+							// Strip permission-bypass flags (e.g. --dangerously-skip-permissions). A
+							// background synopsis only reads the resumed conversation and emits a text
+							// summary - it must never acquire the agent's workspace lock. Left unfiltered
+							// it holds that lock for its full duration and blocks the NEXT queued send
+							// from spawning until it finishes, stalling background queue processing for
+							// as long as the synopsis runs. Mirrors tab-naming, which filters for the
+							// same reason.
+							args: filterYoloArgs(agent.args || [], agent),
 							prompt,
 							agentSessionId: resumeAgentSessionId, // This triggers the agent's resume mechanism
 							// Per-session config overrides (if set)
