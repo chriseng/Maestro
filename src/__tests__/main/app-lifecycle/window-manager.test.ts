@@ -1263,6 +1263,119 @@ describe('app-lifecycle/window-manager', () => {
 			);
 		});
 
+		it('pastes into browser-tab form fields via guest.paste() on Cmd/Ctrl+V (#1063)', async () => {
+			// The permission handler denies `clipboard-read` to webviews, so
+			// Chromium's native Cmd/Ctrl+V silently fails inside browser-tab form
+			// fields. The before-input-event handler must intercept the paste chord
+			// and drive the privileged guest.paste() instead.
+			const { createWindowManager } = await import('../../../main/app-lifecycle/window-manager');
+
+			const windowManager = createWindowManager({
+				windowStateStore: mockWindowStateStore as unknown as Parameters<
+					typeof createWindowManager
+				>[0]['windowStateStore'],
+				isDevelopment: false,
+				preloadPath: '/path/to/preload.js',
+				rendererProductionUrl: 'app://app/index.html',
+				devServerUrl: 'http://localhost:5173',
+				useNativeTitleBar: false,
+				autoHideMenuBar: false,
+			});
+
+			windowManager.createWindow();
+
+			const attachHandler = webContentsEventHandlers.get('did-attach-webview');
+			attachHandler?.({} as any, mockGuestWebContents as any);
+
+			const beforeInputHandler = guestWebContentsEventHandlers.get('before-input-event');
+			expect(beforeInputHandler).toBeDefined();
+
+			// Cmd+V (macOS)
+			const metaEvent = { preventDefault: vi.fn() };
+			beforeInputHandler?.(metaEvent, {
+				type: 'keyDown',
+				key: 'v',
+				code: 'KeyV',
+				meta: true,
+				control: false,
+				alt: false,
+				shift: false,
+			});
+			expect(metaEvent.preventDefault).toHaveBeenCalled();
+			expect(mockGuestWebContents.paste).toHaveBeenCalledTimes(1);
+
+			// Ctrl+V (Windows/Linux)
+			const ctrlEvent = { preventDefault: vi.fn() };
+			beforeInputHandler?.(ctrlEvent, {
+				type: 'keyDown',
+				key: 'v',
+				code: 'KeyV',
+				meta: false,
+				control: true,
+				alt: false,
+				shift: false,
+			});
+			expect(ctrlEvent.preventDefault).toHaveBeenCalled();
+			expect(mockGuestWebContents.paste).toHaveBeenCalledTimes(2);
+
+			// The paste chord must NOT also be forwarded to the renderer as an app
+			// shortcut - it is fully consumed here.
+			expect(mockWebContents.send).not.toHaveBeenCalledWith(
+				'browser-tab:shortcutKey',
+				expect.objectContaining({ key: 'v' })
+			);
+		});
+
+		it('does not hijack non-paste edit chords or plain "v" on browser-tab guests', async () => {
+			const { createWindowManager } = await import('../../../main/app-lifecycle/window-manager');
+
+			const windowManager = createWindowManager({
+				windowStateStore: mockWindowStateStore as unknown as Parameters<
+					typeof createWindowManager
+				>[0]['windowStateStore'],
+				isDevelopment: false,
+				preloadPath: '/path/to/preload.js',
+				rendererProductionUrl: 'app://app/index.html',
+				devServerUrl: 'http://localhost:5173',
+				useNativeTitleBar: false,
+				autoHideMenuBar: false,
+			});
+
+			windowManager.createWindow();
+
+			const attachHandler = webContentsEventHandlers.get('did-attach-webview');
+			attachHandler?.({} as any, mockGuestWebContents as any);
+
+			const beforeInputHandler = guestWebContentsEventHandlers.get('before-input-event');
+
+			// Plain "v" (no modifier) is normal typing - must pass through untouched.
+			const plainEvent = { preventDefault: vi.fn() };
+			beforeInputHandler?.(plainEvent, {
+				type: 'keyDown',
+				key: 'v',
+				code: 'KeyV',
+				meta: false,
+				control: false,
+				alt: false,
+				shift: false,
+			});
+			expect(plainEvent.preventDefault).not.toHaveBeenCalled();
+
+			// Cmd+Shift+V (paste-and-match-style etc.) is not the plain paste chord.
+			const shiftEvent = { preventDefault: vi.fn() };
+			beforeInputHandler?.(shiftEvent, {
+				type: 'keyDown',
+				key: 'v',
+				code: 'KeyV',
+				meta: true,
+				control: false,
+				alt: false,
+				shift: true,
+			});
+
+			expect(mockGuestWebContents.paste).not.toHaveBeenCalled();
+		});
+
 		// Electron 41 removed the legacy `'crashed'` event in favor of
 		// `'render-process-gone'`. These tests pin the wiring so a future
 		// revert can't silently drop renderer-crash reporting.

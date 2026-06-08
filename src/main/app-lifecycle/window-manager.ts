@@ -54,6 +54,9 @@ interface BrowserTabGuestContents {
 	): void;
 	on(event: string, handler: (...args: any[]) => void): void;
 	executeJavaScript(code: string): Promise<unknown>;
+	// Privileged Electron paste: bypasses the web-facing `clipboard-read`
+	// permission that the permission handler denies to webviews (issue #1063).
+	paste(): void;
 }
 
 function isAllowedBrowserTabUrl(rawUrl: string): boolean {
@@ -354,11 +357,24 @@ export function createWindowManager(deps: WindowManagerDependencies): WindowMana
 					if (!input.meta && !input.control && !input.alt) return;
 					if (input.type !== 'keyDown') return;
 					const k = input.key.toLowerCase();
-					// Let standard text-editing shortcuts pass through to the page.
-					// `f` is intentionally NOT in this list: Cmd+F must reach the
-					// renderer so the in-page find bar can open.
+					// Cmd/Ctrl+V: drive paste through the trusted guest webContents API.
+					// Chromium's native paste needs the `clipboard-read` permission, which
+					// the permission handler denies to webviews as a security boundary, so
+					// native paste silently fails inside browser-tab form fields (issue
+					// #1063). guest.paste() is a privileged Electron call that bypasses
+					// that web-facing permission, mirroring the right-click Paste menu
+					// item (issue #1065).
+					const isPaste = (input.meta || input.control) && !input.alt && !input.shift && k === 'v';
+					if (isPaste) {
+						event.preventDefault();
+						guest.paste();
+						return;
+					}
+					// Let the remaining standard text-editing shortcuts pass through to
+					// the page. `f` is intentionally NOT in this list: Cmd+F must reach
+					// the renderer so the in-page find bar can open.
 					const isTextEditing =
-						(input.meta || input.control) && !input.alt && !input.shift && 'acvxz'.includes(k);
+						(input.meta || input.control) && !input.alt && !input.shift && 'acxz'.includes(k);
 					const isRedo = (input.meta || input.control) && !input.alt && input.shift && k === 'z';
 					if (isTextEditing || isRedo) return;
 					event.preventDefault();
