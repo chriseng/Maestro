@@ -313,7 +313,7 @@ export function CreateWorktreeModal({
 								className="w-4 h-4 mt-0.5 shrink-0"
 								style={{ color: theme.colors.error }}
 							/>
-							<p className="text-sm break-words min-w-0" style={{ color: theme.colors.error }}>
+							<p className="text-sm break-all min-w-0" style={{ color: theme.colors.error }}>
 								{error}
 							</p>
 						</div>
