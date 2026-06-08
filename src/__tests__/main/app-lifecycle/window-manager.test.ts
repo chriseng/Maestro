@@ -22,6 +22,7 @@ const mockGuestWebContents = {
 		guestWebContentsEventHandlers.set(event, handler);
 	}),
 	executeJavaScript: vi.fn().mockResolvedValue(undefined),
+	paste: vi.fn(),
 };
 
 // Mock BrowserWindow instance methods
@@ -1324,6 +1325,13 @@ describe('app-lifecycle/window-manager', () => {
 				'browser-tab:shortcutKey',
 				expect.objectContaining({ key: 'v' })
 			);
+
+			// The page-level fallback must also exclude V from its passthrough
+			// list. Otherwise it can race the privileged paste path above.
+			guestWebContentsEventHandlers.get('dom-ready')?.();
+			const injectedScript = mockGuestWebContents.executeJavaScript.mock.calls.at(-1)?.[0];
+			expect(injectedScript).toContain("'acxz'.indexOf(k)");
+			expect(injectedScript).not.toContain("'acvxz'.indexOf(k)");
 		});
 
 		it('does not hijack non-paste edit chords or plain "v" on browser-tab guests', async () => {

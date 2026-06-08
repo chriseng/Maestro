@@ -399,7 +399,7 @@ export function createWindowManager(deps: WindowManagerDependencies): WindowMana
 						var hasAlt=e.altKey;
 						if(!hasMod&&!hasAlt)return;
 						var k=e.key.toLowerCase();
-						var te=hasMod&&!hasAlt&&!e.shiftKey&&'acvxz'.indexOf(k)!==-1;
+						var te=hasMod&&!hasAlt&&!e.shiftKey&&'acxz'.indexOf(k)!==-1;
 						var re=hasMod&&!hasAlt&&e.shiftKey&&k==='z';
 						if(te||re)return;
 						e.preventDefault();
