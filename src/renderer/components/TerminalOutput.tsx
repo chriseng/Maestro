@@ -137,6 +137,37 @@ const summarizeToolInput = (input: unknown): ToolSummary | null => {
 	return { description, detail: detail ?? '' };
 };
 
+/** Max lines of tool output to preview inline before truncating. */
+const TOOL_OUTPUT_PREVIEW_LINES = 8;
+
+/**
+ * Summarize tool output for inline display. MCP tools (and others) return their
+ * result in `toolState.output`; without this the compact tool log shows only the
+ * name + status icon and drops the result entirely. Strings render as-is, objects
+ * are JSON-stringified. Output is capped to a short preview so large results don't
+ * flood the chat.
+ */
+const summarizeToolOutput = (output: unknown): string | null => {
+	if (output === undefined || output === null) return null;
+	let text: string;
+	if (typeof output === 'string') {
+		text = output;
+	} else {
+		try {
+			text = JSON.stringify(output, null, 2);
+		} catch {
+			return null;
+		}
+	}
+	text = text.trim();
+	if (!text) return null;
+	const lines = text.split('\n');
+	if (lines.length > TOOL_OUTPUT_PREVIEW_LINES) {
+		return lines.slice(0, TOOL_OUTPUT_PREVIEW_LINES).join('\n') + '\n…';
+	}
+	return text;
+};
+
 const isHiddenProgressEntry = (log: LogEntry): boolean =>
 	log.source === 'system' && log.id.startsWith('hidden-progress:');
 
@@ -667,6 +698,14 @@ const LogItemComponent = memo(
 								toolInput !== undefined && toolInput !== null
 									? summarizeToolInput(toolInput)
 									: null;
+							// Show the tool result once it has finished. Without this the
+							// compact tool log drops the output entirely (e.g. MCP calls
+							// like squash_repos that take no args render as a bare name).
+							const toolStatus = log.metadata?.toolState?.status;
+							const outputSummary =
+								toolStatus === 'completed' || toolStatus === 'failed' || toolStatus === 'error'
+									? summarizeToolOutput(log.metadata?.toolState?.output)
+									: null;
 
 							return (
 								<div
@@ -722,6 +761,17 @@ const LogItemComponent = memo(
 											}}
 										>
 											{toolSummary.detail}
+										</div>
+									)}
+									{outputSummary && (
+										<div
+											className="mt-1 ml-1 pl-2 opacity-60 break-words whitespace-pre-wrap border-l"
+											style={{
+												color: theme.colors.textMain,
+												borderColor: `${theme.colors.success}40`,
+											}}
+										>
+											{outputSummary}
 										</div>
 									)}
 								</div>
