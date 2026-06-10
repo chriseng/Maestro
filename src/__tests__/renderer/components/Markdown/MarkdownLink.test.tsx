@@ -104,6 +104,12 @@ describe('createMarkdownLink - chat behavior (directExternal, accentText, contex
 		expect(openUrl).toHaveBeenCalledWith('https://example.com', { ctrlKey: true });
 	});
 
+	it('translates Cmd-click (metaKey) into ctrlKey:true for openUrl (#1060)', () => {
+		const el = renderLink(chat(), { href: 'https://example.com', children: 'x' });
+		el.props.onClick(makeEvent({ metaKey: true }));
+		expect(openUrl).toHaveBeenCalledWith('https://example.com', { ctrlKey: true });
+	});
+
 	it('opens file:// links via the shell', () => {
 		const el = renderLink(chat(), { href: 'file:///tmp/x.txt', children: 'x' });
 		el.props.onClick(makeEvent());

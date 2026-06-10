@@ -11,6 +11,18 @@ vi.mock('react-syntax-highlighter/dist/esm/styles/prism', () => ({
 	vs: {},
 }));
 
+// Mock openUrl so link-click tests can assert the exact options passed through
+// (specifically the translated `ctrlKey` modifier) without depending on the
+// settings store's useSystemBrowser default or whether an active session
+// exists. See bug #1060: cmd-click (metaKey) on macOS must translate to the
+// same ctrlKey:true inversion as ctrl-click.
+const { mockOpenUrl } = vi.hoisted(() => ({ mockOpenUrl: vi.fn() }));
+vi.mock('../../../renderer/utils/openUrl', () => ({
+	openUrl: mockOpenUrl,
+	openInSystemBrowser: vi.fn(),
+	openInMaestroBrowser: vi.fn(),
+}));
+
 import {
 	generateProseStyles,
 	generateAutoRunProseStyles,
@@ -759,6 +771,38 @@ describe('createMarkdownComponents link handling', () => {
 		});
 	});
 
+	// Bug #1060: on macOS a Cmd+click sets metaKey (not ctrlKey). The handler
+	// must translate `metaKey || ctrlKey` into the ctrlKey option so the
+	// open-in-browser inversion still fires. Under the old `{ ctrlKey: e.ctrlKey }`
+	// code a metaKey-only click yielded ctrlKey:false, so this would fail.
+	it('should translate Cmd-click (metaKey) into ctrlKey:true for onExternalLinkClick', () => {
+		const onExternalLinkClick = vi.fn();
+		const components = createMarkdownComponents({
+			theme: mockTheme,
+			onExternalLinkClick,
+		});
+		const aComponent = components.a as any;
+
+		const element = aComponent({ node: null, href: 'https://example.com', children: 'link' });
+		const clickEvent = { preventDefault: vi.fn(), metaKey: true, ctrlKey: false } as any;
+		element.props.onClick(clickEvent);
+		expect(onExternalLinkClick).toHaveBeenCalledWith('https://example.com', { ctrlKey: true });
+	});
+
+	it('should pass ctrlKey:false to onExternalLinkClick on a plain click', () => {
+		const onExternalLinkClick = vi.fn();
+		const components = createMarkdownComponents({
+			theme: mockTheme,
+			onExternalLinkClick,
+		});
+		const aComponent = components.a as any;
+
+		const element = aComponent({ node: null, href: 'https://example.com', children: 'link' });
+		const clickEvent = { preventDefault: vi.fn(), metaKey: false, ctrlKey: false } as any;
+		element.props.onClick(clickEvent);
+		expect(onExternalLinkClick).toHaveBeenCalledWith('https://example.com', { ctrlKey: false });
+	});
+
 	it('should NOT call onExternalLinkClick for relative paths', () => {
 		const onExternalLinkClick = vi.fn();
 		const components = createMarkdownComponents({
@@ -812,6 +856,70 @@ describe('createMarkdownComponents link handling', () => {
 		element.props.onClick(clickEvent);
 		expect(onFileClick).toHaveBeenCalledWith('LICENSE', { openInNewTab: false });
 		expect(onExternalLinkClick).not.toHaveBeenCalled();
+	});
+});
+
+// ---------------------------------------------------------------------------
+// createWizardBubbleMarkdownComponents - link handling (#1060)
+// ---------------------------------------------------------------------------
+
+describe('createWizardBubbleMarkdownComponents link handling', () => {
+	beforeEach(() => {
+		mockOpenUrl.mockClear();
+	});
+
+	// Under the old `{ ctrlKey: e.ctrlKey }` code a metaKey-only click yielded
+	// ctrlKey:false, so this guard would fail. See bug #1060.
+	it('should translate Cmd-click (metaKey) into ctrlKey:true for openUrl', () => {
+		const components = createWizardBubbleMarkdownComponents(mockTheme);
+		const aComponent = components.a as any;
+
+		const element = aComponent({ href: 'https://example.com', children: 'link' });
+		const clickEvent = { preventDefault: vi.fn(), metaKey: true, ctrlKey: false } as any;
+		element.props.onClick(clickEvent);
+		expect(mockOpenUrl).toHaveBeenCalledWith('https://example.com', { ctrlKey: true });
+	});
+
+	it('should pass ctrlKey:false to openUrl on a plain click', () => {
+		const components = createWizardBubbleMarkdownComponents(mockTheme);
+		const aComponent = components.a as any;
+
+		const element = aComponent({ href: 'https://example.com', children: 'link' });
+		const clickEvent = { preventDefault: vi.fn(), metaKey: false, ctrlKey: false } as any;
+		element.props.onClick(clickEvent);
+		expect(mockOpenUrl).toHaveBeenCalledWith('https://example.com', { ctrlKey: false });
+	});
+});
+
+// ---------------------------------------------------------------------------
+// createReleaseNotesMarkdownComponents - link handling (#1060)
+// ---------------------------------------------------------------------------
+
+describe('createReleaseNotesMarkdownComponents link handling', () => {
+	beforeEach(() => {
+		mockOpenUrl.mockClear();
+	});
+
+	// Under the old `{ ctrlKey: e.ctrlKey }` code a metaKey-only click yielded
+	// ctrlKey:false, so this guard would fail. See bug #1060.
+	it('should translate Cmd-click (metaKey) into ctrlKey:true for openUrl', () => {
+		const components = createReleaseNotesMarkdownComponents(mockTheme);
+		const aComponent = components.a as any;
+
+		const element = aComponent({ href: 'https://example.com', children: 'link' });
+		const clickEvent = { preventDefault: vi.fn(), metaKey: true, ctrlKey: false } as any;
+		element.props.onClick(clickEvent);
+		expect(mockOpenUrl).toHaveBeenCalledWith('https://example.com', { ctrlKey: true });
+	});
+
+	it('should pass ctrlKey:false to openUrl on a plain click', () => {
+		const components = createReleaseNotesMarkdownComponents(mockTheme);
+		const aComponent = components.a as any;
+
+		const element = aComponent({ href: 'https://example.com', children: 'link' });
+		const clickEvent = { preventDefault: vi.fn(), metaKey: false, ctrlKey: false } as any;
+		element.props.onClick(clickEvent);
+		expect(mockOpenUrl).toHaveBeenCalledWith('https://example.com', { ctrlKey: false });
 	});
 });
 

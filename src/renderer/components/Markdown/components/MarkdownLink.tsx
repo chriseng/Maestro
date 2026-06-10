@@ -127,14 +127,17 @@ export function createMarkdownLink(config: MarkdownLinkConfig) {
 			if (behavior.directExternal) {
 				// Chat: open http/https via openUrl; file:// via openPath; attempt
 				// git@host:user/repo -> https conversion for anything else.
+				// `metaKey || ctrlKey`: on macOS Cmd-click sets metaKey, so translate
+				// it to the same ctrlKey inversion openUrl expects (#1060).
 				if (/^file:\/\//.test(href)) {
 					window.maestro.shell.openPath(href.replace(/^file:\/\//, ''));
 				} else if (/^https?:\/\//.test(href)) {
-					openUrl(href, { ctrlKey: e.ctrlKey });
+					openUrl(href, { ctrlKey: e.metaKey || e.ctrlKey });
 				} else {
 					try {
 						const converted = gitToHttps(href);
-						if (/^https?:\/\//.test(converted)) openUrl(converted, { ctrlKey: e.ctrlKey });
+						if (/^https?:\/\//.test(converted))
+							openUrl(converted, { ctrlKey: e.metaKey || e.ctrlKey });
 					} catch {
 						// Silently ignore unparseable URLs
 					}
@@ -144,7 +147,7 @@ export function createMarkdownLink(config: MarkdownLinkConfig) {
 
 			// Doc: route external links through the caller's callback.
 			if (onExternalLinkClick && /^https?:\/\/|^mailto:/.test(href)) {
-				onExternalLinkClick(href, { ctrlKey: e.ctrlKey });
+				onExternalLinkClick(href, { ctrlKey: e.metaKey || e.ctrlKey });
 				return;
 			}
 
