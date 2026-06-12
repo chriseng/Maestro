@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
 	readDirRemote,
 	readFileRemote,
+	readFileTailRemote,
 	statRemote,
 	directorySizeRemote,
 	writeFileRemote,
@@ -404,6 +405,73 @@ describe('remote-fs', () => {
 
 			expect(result.success).toBe(true);
 			expect(result.data).toBe('Line 1\nLine 2\r\nLine 3\tTabbed');
+		});
+	});
+
+	describe('readFileTailRemote', () => {
+		it('reads the whole file from offset 0 (tail -c +1)', async () => {
+			const deps = createMockDeps({ stdout: 'a\nb\nc\n', stderr: '', exitCode: 0 });
+
+			const result = await readFileTailRemote('/log/events.jsonl', baseConfig, 0, deps);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toBe('a\nb\nc\n');
+			const cmd = (deps.execSsh as any).mock.calls[0][1].at(-1);
+			// tail -c +N is 1-indexed, so skipping 0 bytes starts at byte 1.
+			expect(cmd).toMatch(/tail -c \+1 /);
+		});
+
+		it('starts at offset+1 so already-consumed bytes are skipped', async () => {
+			const deps = createMockDeps({ stdout: 'new tail\n', stderr: '', exitCode: 0 });
+
+			const result = await readFileTailRemote('/log/events.jsonl', baseConfig, 42, deps);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toBe('new tail\n');
+			const cmd = (deps.execSsh as any).mock.calls[0][1].at(-1);
+			expect(cmd).toMatch(/tail -c \+43 /);
+		});
+
+		it('floors and clamps a fractional or negative offset', async () => {
+			const deps = createMockDeps({ stdout: '', stderr: '', exitCode: 0 });
+
+			await readFileTailRemote('/log/events.jsonl', baseConfig, 10.9, deps);
+			expect((deps.execSsh as any).mock.calls[0][1].at(-1)).toMatch(/tail -c \+11 /);
+
+			const deps2 = createMockDeps({ stdout: '', stderr: '', exitCode: 0 });
+			await readFileTailRemote('/log/events.jsonl', baseConfig, -5, deps2);
+			expect((deps2.execSsh as any).mock.calls[0][1].at(-1)).toMatch(/tail -c \+1 /);
+		});
+
+		it('shell-escapes the remote path', async () => {
+			const deps = createMockDeps({ stdout: '', stderr: '', exitCode: 0 });
+
+			await readFileTailRemote("/log/with spaces/events'.jsonl", baseConfig, 0, deps);
+
+			const cmd = (deps.execSsh as any).mock.calls[0][1].at(-1);
+			expect(cmd).toContain("'/log/with spaces/events'\\''.jsonl'");
+		});
+
+		it('maps a missing file to a "File not found" error', async () => {
+			const deps = createMockDeps({
+				stdout: '',
+				stderr: 'tail: cannot open /gone.jsonl: No such file or directory',
+				exitCode: 1,
+			});
+
+			const result = await readFileTailRemote('/gone.jsonl', baseConfig, 0, deps);
+
+			expect(result.success).toBe(false);
+			expect(result.error).toContain('File not found');
+		});
+
+		it('returns an empty string when nothing new is past the offset', async () => {
+			const deps = createMockDeps({ stdout: '', stderr: '', exitCode: 0 });
+
+			const result = await readFileTailRemote('/log/events.jsonl', baseConfig, 100, deps);
+
+			expect(result.success).toBe(true);
+			expect(result.data).toBe('');
 		});
 	});
 
