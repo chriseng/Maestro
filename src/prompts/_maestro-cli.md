@@ -307,6 +307,8 @@ Lifecycle management of Maestro agents and remote-execution targets.
     [--custom-args <args>] [--env KEY=VALUE]... [--model <model>] [--effort <level>] \
     [--context-window <size>] [--ssh-remote <id>] [--ssh-cwd <path>] \
     [--auto-run-folder <path>] [--json]
+{{MAESTRO_CLI_PATH}} create-worktree -a, --agent <parent-id> -b, --branch <name> \
+    [--base-branch <ref>] [-m, --message <text>] [--json]
 {{MAESTRO_CLI_PATH}} remove-agent <agent-id> [--json]
 
 # SSH remotes (used by agents that execute on a remote host)

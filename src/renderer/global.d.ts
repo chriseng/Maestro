@@ -400,6 +400,20 @@ interface MaestroAPI {
 			responseChannel: string,
 			result: { success: boolean; playbookId?: string; error?: string }
 		) => void;
+		onRemoteCreateWorktreeSession: (
+			callback: (
+				parentSessionId: string,
+				config: {
+					branchName: string;
+					baseBranch?: string;
+				},
+				responseChannel: string
+			) => void
+		) => () => void;
+		sendRemoteCreateWorktreeSessionResponse: (
+			responseChannel: string,
+			result: { success: boolean; sessionId?: string; error?: string }
+		) => void;
 		onRemoteSetAutoRunFolder: (
 			callback: (sessionId: string, folderPath: string, responseChannel: string) => void
 		) => () => void;

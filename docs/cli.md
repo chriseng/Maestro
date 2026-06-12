@@ -379,6 +379,31 @@ The flag table below covers `create-agent`:
 | `--auto-run-folder <path>`        | Auto Run / playbooks folder for this agent               | `<cwd>/.maestro/playbooks` |
 | `--json`                          | Machine-readable JSON output                             | -                          |
 
+### Creating Worktree Agents
+
+Branch a new agent off an existing parent agent into its own git worktree, without an Auto Run playbook. This mirrors the desktop "create worktree" flow: the parent agent must already exist in the running app, the desktop creates the worktree on disk and a child session linked to the parent, then hands back the new agent's ID.
+
+```bash
+# Create a worktree agent off a parent, on a new branch
+maestro-cli create-worktree -a <parent-agent-id> -b feature/new-thing
+
+# Base the new branch on a specific ref when it does not yet exist
+maestro-cli create-worktree -a <parent-agent-id> -b feature/new-thing --base-branch rc
+
+# Create the worktree and immediately dispatch an initial prompt to it
+maestro-cli create-worktree -a <parent-agent-id> -b feature/new-thing -m "Start on the API layer"
+```
+
+The optional `--message` is delivered to the new agent as a plain prompt (not an Auto Run loop) on the same connection, addressed by the ID the desktop just returned. Both `--agent` and `--branch` support the usual partial-ID resolution.
+
+| Flag                   | Description                                                                   | Default          |
+| ---------------------- | ----------------------------------------------------------------------------- | ---------------- |
+| `-a, --agent <id>`     | Parent agent ID the worktree branches from (required)                         | -                |
+| `-b, --branch <name>`  | Branch name for the worktree, created if it does not exist (required)         | -                |
+| `--base-branch <name>` | Ref the new branch is based on when it does not yet exist (e.g. `rc`, `main`) | parent repo HEAD |
+| `-m, --message <text>` | Optional initial prompt dispatched to the new agent after creation            | -                |
+| `--json`               | Machine-readable JSON output                                                  | -                |
+
 ### Listing Resources
 
 ```bash

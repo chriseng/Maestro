@@ -84,12 +84,17 @@ export interface ParseArgsOptions {
 export const DEFAULT_MAX_WAIT_SECONDS = 300;
 
 // How long to wait for claude to produce its FIRST JSONL entry after the prompt
-// is sent, before giving up with `first_byte_timeout`. Generous enough to cover
-// a cold TUI start + MCP handshake + model warmup (the discovery floor comment
-// notes cold starts routinely need well over 10s), but far below the idle
-// budget so a turn that never starts fails fast and loud instead of hanging the
-// whole `--max-wait` window. Overridable via `--first-byte-timeout`.
-export const DEFAULT_FIRST_BYTE_TIMEOUT_SECONDS = 120;
+// is sent, before giving up with `first_byte_timeout`. Must cover a cold TUI
+// start + MCP handshake + model warmup AND the turn's own pre-transcript work:
+// heavy scheduled prompts (full news analysis + web search + extended thinking)
+// can keep the working spinner animating for minutes BEFORE claude writes its
+// first transcript line, and the `--resume` path additionally reloads a large
+// prior conversation before new output begins. At the old 120s, those healthy
+// turns were being killed mid-think. 240s clears them while still sitting a
+// real margin below the 300s idle budget, so a turn that genuinely never starts
+// still fails before the whole `--max-wait` window. Overridable via
+// `--first-byte-timeout`.
+export const DEFAULT_FIRST_BYTE_TIMEOUT_SECONDS = 240;
 
 const PROMPT_VALUE_FLAGS = new Set(['-p', '--print', '--prompt']);
 const CONSUMED_BOOLEAN_FLAGS = new Set(['-h', '--help', '-v', '--version']);

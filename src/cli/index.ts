@@ -31,6 +31,7 @@ import {
 	cuePipelineReplace,
 } from './commands/cue-pipeline';
 import { createAgent } from './commands/create-agent';
+import { createWorktree } from './commands/create-worktree';
 import { removeAgent } from './commands/remove-agent';
 import { updateAgent } from './commands/update-agent';
 import { listSshRemotes } from './commands/list-ssh-remotes';
@@ -399,6 +400,31 @@ program
 	)
 	.option('--json', 'Output as JSON (for scripting)')
 	.action(createAgent);
+
+// Create-worktree command - create a new agent in a git worktree off a parent
+// agent, without an Auto Run playbook. The parent agent must already exist in
+// the running desktop app.
+program
+	.command('create-worktree')
+	.description('Create a new agent in a git worktree branched off an existing parent agent')
+	.requiredOption(
+		'-a, --agent <id>',
+		'Parent agent ID the worktree branches from (use "maestro-cli list agents" to find IDs)'
+	)
+	.requiredOption(
+		'-b, --branch <name>',
+		'Branch name for the worktree (created if it does not exist)'
+	)
+	.option(
+		'--base-branch <name>',
+		'Ref the new branch is based on when it does not yet exist (e.g. "rc" or "main"). Defaults to the parent repo HEAD.'
+	)
+	.option(
+		'-m, --message <text>',
+		'Optional initial prompt to dispatch to the new agent after creation'
+	)
+	.option('--json', 'Output as JSON (for scripting)')
+	.action(createWorktree);
 
 // Remove agent command - remove an agent from the Maestro desktop app
 program

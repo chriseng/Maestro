@@ -19,6 +19,7 @@ src/cli/
 │   ├── auto-run.ts
 │   ├── clean-playbooks.ts
 │   ├── create-agent.ts       # Create agent via WebSocket (requires running app)
+│   ├── create-worktree.ts    # Create worktree agent off a parent via WebSocket (requires running app)
 │   ├── create-ssh-remote.ts  # Create SSH remote via disk I/O
 │   ├── list-agents.ts
 │   ├── list-groups.ts
@@ -217,6 +218,19 @@ Options:
 - `--env KEY=VALUE` - Repeatable environment variable; parsed into a `Record<string, string>`
 - `--context-window <size>` - Validated as positive integer
 - `--ssh-remote <id>` + `--ssh-cwd <path>` - Builds `sessionSshRemoteConfig` for remote execution
+
+### `create-worktree`
+
+Create a new agent in a git worktree branched off an existing parent agent, without an Auto Run playbook. Sends a `create_worktree_session` message; the desktop creates the worktree on disk, builds a child session linked to the parent (reusing `spawnWorktreeAgentAndDispatch`), and returns the new agent's session ID. The optional `--message` is then delivered as a plain prompt over the same connection via `send_command`, addressed by the returned ID - it deliberately does NOT route through `dispatch`, which re-resolves the agent against the CLI's persisted sessions file and would race the desktop's debounced persistence.
+
+```bash
+maestro-cli create-worktree -a <parent-agent-id> -b <branch-name> [--base-branch <ref>] [-m <message>] [--json]
+```
+
+- `-a, --agent <id>` - Parent agent ID, supports partial IDs via `resolveTargetSessionId()` (required)
+- `-b, --branch <name>` - Branch name for the worktree, created if it does not exist (required)
+- `--base-branch <name>` - Ref the new branch is based on when it does not yet exist; defaults to the parent repo HEAD
+- `-m, --message <text>` - Optional initial prompt dispatched to the new agent after creation
 
 ### `remove-agent <agent-id>`
 

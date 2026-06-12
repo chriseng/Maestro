@@ -287,8 +287,24 @@ async function runMode(args: ParsedArgs): Promise<never> {
 	// Spread Enter re-submits across the first-byte budget. Each tap is gated on
 	// the turn not having started (and not finalized), so it stops itself the
 	// moment any transcript byte arrives even before cleanupTimers runs.
+	//
+	// TUI-liveness gate: the JSONL "first entry" signal lags the turn — claude
+	// can be demonstrably working (spinner animating, token counter rising) for
+	// a long time before it writes its first transcript line. We must NOT keep
+	// pressing Enter into a turn that has already started: stray taps risk
+	// landing as interrupts or queued submits. So we only re-tap while the TUI
+	// screen is STATIC (the prompt is genuinely parked behind slow MCP/plugin
+	// init) and stop the instant the screen starts painting (proof the turn
+	// began). We deliberately do NOT clear the first-byte timer here: liveness
+	// stops the tapping, but only a real JSONL entry counts as first byte, so a
+	// screen that animates for an unrelated reason degrades to "ride out the
+	// first-byte budget", never a premature success. The tap's own echo is
+	// folded into the baseline after each tap, so a tap never trips its own
+	// gate; a no-op Enter on an already-parked input paints nothing, and a tap
+	// that finally submits the parked prompt starts the spinner we then stop on.
 	const startResubmitLoop = (): void => {
 		if (resubmitTimer) return;
+		let lastScreen: string | null = null;
 		resubmitTimer = setInterval(() => {
 			if (finalized || firstEntrySeen) {
 				if (resubmitTimer) {
@@ -297,7 +313,18 @@ async function runMode(args: ParsedArgs): Promise<never> {
 				}
 				return;
 			}
+			if (lastScreen !== null && driver.getScreenTail() !== lastScreen) {
+				// Screen painted since our last tap with no JSONL entry yet — the
+				// working spinner is animating, so the turn has started. Stop
+				// tapping and let the first-byte/idle timers govern from here.
+				if (resubmitTimer) {
+					clearInterval(resubmitTimer);
+					resubmitTimer = null;
+				}
+				return;
+			}
 			driver.resubmit();
+			lastScreen = driver.getScreenTail();
 		}, RESUBMIT_INTERVAL_MS);
 	};
 
