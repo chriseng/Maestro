@@ -22,6 +22,7 @@ import { status } from './commands/status';
 import { autoRun } from './commands/auto-run';
 import { cueTrigger } from './commands/cue-trigger';
 import { cueList } from './commands/cue-list';
+import { cueSchedule } from './commands/cue-schedule';
 import {
 	cuePipelineAdd,
 	cuePipelineExport,
@@ -349,6 +350,33 @@ cue
 	.description('List all Cue subscriptions across agents')
 	.option('--json', 'Output as JSON (for scripting)')
 	.action(cueList);
+
+// Cue schedule — author / inspect / cancel one-shot `time.once` subscriptions.
+// Primary agent surface for "in 20 minutes do X" or "remind me at 4pm…" — writes
+// directly to the agent's `.maestro/cue.yaml` so it works without the desktop
+// app running. See `cue-schedule.ts` for the full flag matrix.
+cue
+	.command('schedule')
+	.description('Schedule a one-shot Cue task (or --list / --cancel pending tasks)')
+	.option('--in <duration>', 'Fire after a relative delay (e.g. 30s, 20m, 2h, 1d)')
+	.option('--at <timestamp>', 'Fire at ISO-8601 timestamp or "YYYY-MM-DD HH:MM" (local time)')
+	.option('--list', 'List all pending one-shot tasks across agents')
+	.option('--cancel <name>', 'Cancel a pending one-shot task by name')
+	.option('-a, --agent <id-or-name>', 'Target agent (required when creating)')
+	.option('-p, --prompt <text>', 'Prompt to send when the task fires')
+	.option('--notify', 'Show a toast notification when the task fires')
+	.option('--sticky', 'Make the notify toast sticky (requires --notify)')
+	.option('-m, --message <text>', 'Body for the notify toast (defaults to label/prompt)')
+	.option('-n, --name <name>', 'Custom subscription name (auto-generated when omitted)')
+	.option('-l, --label <text>', 'Human-readable label (defaults to truncated prompt)')
+	.option('--pipeline <name>', 'Pipeline name (default: Tasks)')
+	.option('--grace-minutes <n>', 'Override the default 360-minute grace window')
+	.option(
+		'--keep-on-failure',
+		'Keep the subscription on a failed/timed-out run (default: self-destructs on both success and failure)'
+	)
+	.option('--json', 'Output as JSON (for scripting)')
+	.action(cueSchedule);
 
 // Cue pipeline subcommands — manage entries in cue-pipeline-layout.json.
 // Designed for batch scaffolding (e.g. PowerShell scripts that bootstrap
