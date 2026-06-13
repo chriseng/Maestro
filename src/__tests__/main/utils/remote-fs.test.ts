@@ -162,10 +162,12 @@ describe('remote-fs', () => {
 
 			await readDirRemote("/path/with spaces/and'quotes", baseConfig, deps);
 
-			// Accept full SSH binary path (e.g., /usr/bin/ssh or C:\Windows\System32\OpenSSH\ssh.exe) for cross-platform compatibility
+			// Accept full SSH binary path (e.g., /usr/bin/ssh or C:\Windows\System32\OpenSSH\ssh.exe) for cross-platform compatibility.
+			// readDir streams no stdin payload, so the optional `input` arg is undefined.
 			expect(deps.execSsh).toHaveBeenCalledWith(
 				expect.stringMatching(/ssh(\.exe)?$/),
-				expect.any(Array)
+				expect.any(Array),
+				undefined
 			);
 			const call = (deps.execSsh as any).mock.calls[0][1];
 			const remoteCommand = call[call.length - 1];
@@ -952,10 +954,14 @@ describe('remote-fs', () => {
 			const result = await writeFileRemote('/output.txt', 'Hello, World!', baseConfig, deps);
 
 			expect(result.success).toBe(true);
-			// Verify the SSH command includes base64-encoded content
-			const call = (deps.execSsh as any).mock.calls[0][1];
-			const remoteCommand = call[call.length - 1];
+			// The remote command decodes base64 read from stdin; the payload itself
+			// is streamed via stdin (3rd execSsh arg), not embedded in the command,
+			// to avoid the ARG_MAX "Argument list too long" failure on large files.
+			const call = (deps.execSsh as any).mock.calls[0];
+			const remoteCommand = call[1][call[1].length - 1];
 			expect(remoteCommand).toContain('base64 -d');
+			expect(remoteCommand).not.toContain('echo');
+			expect(call[2]).toBe(Buffer.from('Hello, World!', 'utf-8').toString('base64'));
 		});
 
 		it('handles content with special characters', async () => {
@@ -969,10 +975,9 @@ describe('remote-fs', () => {
 			const result = await writeFileRemote('/output.txt', content, baseConfig, deps);
 
 			expect(result.success).toBe(true);
-			// Verify base64 encoding is used (safe for special chars)
-			const call = (deps.execSsh as any).mock.calls[0][1];
-			const remoteCommand = call[call.length - 1];
-			expect(remoteCommand).toContain(Buffer.from(content, 'utf-8').toString('base64'));
+			// base64 encoding (passed via stdin) keeps special chars safe
+			const input = (deps.execSsh as any).mock.calls[0][2];
+			expect(input).toBe(Buffer.from(content, 'utf-8').toString('base64'));
 		});
 
 		it('handles permission denied on write', async () => {
@@ -1013,12 +1018,11 @@ describe('remote-fs', () => {
 			const result = await writeFileRemote('/output.png', binaryContent, baseConfig, deps);
 
 			expect(result.success).toBe(true);
-			// Verify the SSH command includes base64-encoded content from buffer
-			const call = (deps.execSsh as any).mock.calls[0][1];
-			const remoteCommand = call[call.length - 1];
+			// Command decodes base64 from stdin; the encoded buffer rides on stdin
+			const call = (deps.execSsh as any).mock.calls[0];
+			const remoteCommand = call[1][call[1].length - 1];
 			expect(remoteCommand).toContain('base64 -d');
-			// Verify it contains the base64-encoded buffer content
-			expect(remoteCommand).toContain(binaryContent.toString('base64'));
+			expect(call[2]).toBe(binaryContent.toString('base64'));
 		});
 
 		it('correctly encodes Buffer vs string content differently', async () => {
@@ -1033,17 +1037,15 @@ describe('remote-fs', () => {
 			const testBuffer = Buffer.from([0x48, 0x65, 0x6c, 0x6c, 0x6f]); // Same as 'Hello' in ASCII
 
 			await writeFileRemote('/string.txt', testString, baseConfig, deps);
-			const stringCall = (deps.execSsh as any).mock.calls[0][1];
-			const stringCommand = stringCall[stringCall.length - 1];
+			const stringInput = (deps.execSsh as any).mock.calls[0][2];
 
 			await writeFileRemote('/buffer.txt', testBuffer, baseConfig, deps);
-			const bufferCall = (deps.execSsh as any).mock.calls[1][1];
-			const bufferCommand = bufferCall[bufferCall.length - 1];
+			const bufferInput = (deps.execSsh as any).mock.calls[1][2];
 
 			// Both should produce the same base64 since 'Hello' === Buffer([0x48, 0x65, 0x6c, 0x6c, 0x6f])
 			const expectedBase64 = Buffer.from('Hello', 'utf-8').toString('base64');
-			expect(stringCommand).toContain(expectedBase64);
-			expect(bufferCommand).toContain(expectedBase64);
+			expect(stringInput).toBe(expectedBase64);
+			expect(bufferInput).toBe(expectedBase64);
 		});
 	});
 

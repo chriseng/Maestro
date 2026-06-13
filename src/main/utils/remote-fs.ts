@@ -58,8 +58,12 @@ export interface RemoteFsResult<T> {
  * Dependencies that can be injected for testing.
  */
 export interface RemoteFsDeps {
-	/** Function to execute SSH commands */
-	execSsh: (command: string, args: string[]) => Promise<ExecResult>;
+	/**
+	 * Function to execute SSH commands. An optional `input` is written to the
+	 * remote command's stdin (forwarded by ssh), letting large payloads bypass
+	 * the OS argv length limit (ARG_MAX) that inline command strings hit.
+	 */
+	execSsh: (command: string, args: string[], input?: string) => Promise<ExecResult>;
 	/** Function to build SSH args from config */
 	buildSshArgs: (config: SshRemoteConfig) => string[];
 }
@@ -68,8 +72,8 @@ export interface RemoteFsDeps {
  * Default dependencies using real implementations.
  */
 const defaultDeps: RemoteFsDeps = {
-	execSsh: (command: string, args: string[]): Promise<ExecResult> => {
-		return execFileNoThrow(command, args, undefined, { timeout: SSH_COMMAND_TIMEOUT_MS });
+	execSsh: (command: string, args: string[], input?: string): Promise<ExecResult> => {
+		return execFileNoThrow(command, args, undefined, { timeout: SSH_COMMAND_TIMEOUT_MS, input });
 	},
 	buildSshArgs: (config: SshRemoteConfig): string[] => {
 		return sshRemoteManager.buildSshArgs(config);
@@ -222,7 +226,8 @@ function getBackoffDelay(attempt: number, baseDelay: number, maxDelay: number): 
 async function execRemoteCommand(
 	config: SshRemoteConfig,
 	remoteCommand: string,
-	deps: RemoteFsDeps = defaultDeps
+	deps: RemoteFsDeps = defaultDeps,
+	input?: string
 ): Promise<ExecResult> {
 	const { maxRetries, baseDelayMs, maxDelayMs } = DEFAULT_RETRY_CONFIG;
 	let lastResult: ExecResult | null = null;
@@ -243,7 +248,7 @@ async function execRemoteCommand(
 			const sshArgs = deps.buildSshArgs(config);
 			sshArgs.push(remoteCommand);
 
-			const result = await deps.execSsh(sshPath, sshArgs);
+			const result = await deps.execSsh(sshPath, sshArgs, input);
 			lastResult = result;
 
 			// Success - return immediately
@@ -934,10 +939,14 @@ export async function writeFileRemote(
 		? content.toString('base64')
 		: Buffer.from(content, 'utf-8').toString('base64');
 
-	// Decode base64 on remote and write to file
-	const remoteCommand = `echo '${base64Content}' | base64 -d > ${escapedPath}`;
+	// Decode base64 on remote and write to file. The base64 payload is streamed
+	// over the remote command's stdin rather than embedded inline in the command
+	// string: an inline `echo '<base64>'` makes the whole payload a single argv
+	// entry, and large files blow past the OS argv limit (ARG_MAX), failing with
+	// "/bin/bash: Argument list too long". stdin has no such limit.
+	const remoteCommand = `base64 -d > ${escapedPath}`;
 
-	const result = await execRemoteCommand(sshRemote, remoteCommand, deps);
+	const result = await execRemoteCommand(sshRemote, remoteCommand, deps, base64Content);
 
 	if (result.exitCode !== 0) {
 		const error = result.stderr || `Failed to write file: ${filePath}`;

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
 	resolveClaudeSpawnMode,
 	applyClaudeSpawnDecision,
+	buildRemoteInteractiveSpawn,
+	REMOTE_MAESTRO_P_COMMAND,
 	type ResolveClaudeSpawnModeDeps,
 } from '../../../main/agents/resolveClaudeSpawnMode';
 import type { UsageSnapshot } from '../../../main/agents/claude-mode-selector';
@@ -66,7 +68,20 @@ describe('resolveClaudeSpawnMode', () => {
 		expect(r.maestroPBinPath).toBeNull();
 	});
 
-	it('SSH-enabled claude spawns stay on API even when interactive is selected', () => {
+	it('SSH-enabled claude with api token mode stays on API', () => {
+		const r = resolveClaudeSpawnMode({
+			agent: claudeAgent,
+			tokenMode: 'api',
+			sshEnabled: true,
+			command: 'claude',
+			now: NOW,
+			deps: makeDeps(),
+		});
+		expect(r.mode).toBe('api');
+		expect(r.remote).toBeFalsy();
+	});
+
+	it('SSH-enabled claude with interactive token mode resolves to remote interactive', () => {
 		const r = resolveClaudeSpawnMode({
 			agent: claudeAgent,
 			tokenMode: 'interactive',
@@ -75,7 +90,41 @@ describe('resolveClaudeSpawnMode', () => {
 			now: NOW,
 			deps: makeDeps(),
 		});
+		expect(r.mode).toBe('interactive');
+		expect(r.remote).toBe(true);
+		// No LOCAL maestro-p script is used for remote spawns; maestro-p runs on
+		// the remote host.
+		expect(r.maestroPBinPath).toBeNull();
+	});
+
+	it('SSH-enabled claude with dynamic token mode falls back to API (no remote quota signal)', () => {
+		const r = resolveClaudeSpawnMode({
+			agent: claudeAgent,
+			tokenMode: 'dynamic',
+			sshEnabled: true,
+			command: 'claude',
+			// Dynamic is not a valid remote choice (the selector hides it); the
+			// local snapshot says nothing about the remote account, so dynamic must
+			// NOT silently drive the remote TUI / spend Max quota - it resolves api.
+			deps: makeDeps({ getUsageSnapshot: () => healthySnapshot() }),
+			now: NOW,
+		});
 		expect(r.mode).toBe('api');
+		expect(r.remote).toBeFalsy();
+	});
+
+	it('SSH-enabled remote interactive carries a custom remote claude path as the real bin', () => {
+		const r = resolveClaudeSpawnMode({
+			agent: claudeAgent,
+			tokenMode: 'interactive',
+			sshEnabled: true,
+			command: 'claude',
+			sessionCustomPath: '/remote/bin/claude',
+			now: NOW,
+			deps: makeDeps(),
+		});
+		expect(r.remote).toBe(true);
+		expect(r.claudeRealBinPath).toBe('/remote/bin/claude');
 	});
 
 	it('api mode resolves to api', () => {
@@ -345,5 +394,73 @@ describe('applyClaudeSpawnDecision (batch surfaces)', () => {
 		});
 		expect(result.command).toBe('/custom/maestro-p');
 		expect(result.args).toEqual(['--print', '--', 'hi']);
+	});
+});
+
+describe('buildRemoteInteractiveSpawn (SSH remote surfaces)', () => {
+	it('returns null for an API decision (leave SSH config untouched)', () => {
+		const result = buildRemoteInteractiveSpawn({
+			decision: { mode: 'api', reason: 'auto', maestroPBinPath: null },
+			interactiveModeArgs: ['--dangerously-skip-permissions'],
+		});
+		expect(result).toBeNull();
+	});
+
+	it('returns null for a LOCAL interactive decision (not remote)', () => {
+		const result = buildRemoteInteractiveSpawn({
+			decision: {
+				mode: 'interactive',
+				reason: 'auto',
+				maestroPBinPath: '/bundled/maestro-p.js',
+			},
+			interactiveModeArgs: ['--dangerously-skip-permissions'],
+		});
+		expect(result).toBeNull();
+	});
+
+	it('swaps the command to maestro-p and prepends the interactive flags for a remote decision', () => {
+		const result = buildRemoteInteractiveSpawn({
+			decision: { mode: 'interactive', reason: 'auto', maestroPBinPath: null, remote: true },
+			interactiveModeArgs: ['--dangerously-skip-permissions'],
+		});
+		expect(result).not.toBeNull();
+		expect(result!.command).toBe(REMOTE_MAESTRO_P_COMMAND);
+		expect(result!.prependArgs).toEqual(['--dangerously-skip-permissions']);
+		// No MAESTRO_CLAUDE_BIN when no custom remote claude path: maestro-p
+		// defaults to `claude` on the remote PATH.
+		expect(result!.env).toEqual({});
+	});
+
+	it('points MAESTRO_CLAUDE_BIN at a custom remote claude path when provided', () => {
+		const result = buildRemoteInteractiveSpawn({
+			decision: {
+				mode: 'interactive',
+				reason: 'auto',
+				maestroPBinPath: null,
+				remote: true,
+				claudeRealBinPath: '/remote/bin/claude',
+			},
+			interactiveModeArgs: ['--dangerously-skip-permissions'],
+			remoteClaudeBin: '/remote/bin/claude',
+		});
+		expect(result!.env).toEqual({ MAESTRO_CLAUDE_BIN: '/remote/bin/claude' });
+	});
+
+	it('injects --max-wait ahead of the interactive flags for background surfaces', () => {
+		const result = buildRemoteInteractiveSpawn({
+			decision: { mode: 'interactive', reason: 'auto', maestroPBinPath: null, remote: true },
+			interactiveModeArgs: ['--dangerously-skip-permissions'],
+			maxWaitSeconds: 600,
+		});
+		expect(result!.prependArgs).toEqual(['--max-wait', '600', '--dangerously-skip-permissions']);
+	});
+
+	it('omits --max-wait when no positive budget is given', () => {
+		const result = buildRemoteInteractiveSpawn({
+			decision: { mode: 'interactive', reason: 'auto', maestroPBinPath: null, remote: true },
+			interactiveModeArgs: ['--dangerously-skip-permissions'],
+			maxWaitSeconds: 0,
+		});
+		expect(result!.prependArgs).toEqual(['--dangerously-skip-permissions']);
 	});
 });

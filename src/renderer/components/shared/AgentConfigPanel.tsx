@@ -368,7 +368,10 @@ export function AgentConfigPanel({
 	compact = false,
 	showBuiltInEnvVars = false,
 	isSshEnabled = false,
-	enableMaestroP = false,
+	// Left undefined when never configured (NOT coerced to false): getClaudeTokenMode
+	// reads that "unset" state to default an SSH agent to the TUI. An explicit
+	// false (user picked API) collapses to api as usual.
+	enableMaestroP,
 	onEnableMaestroPChange,
 	maestroPMode,
 	onMaestroPModeChange,
@@ -391,8 +394,25 @@ export function AgentConfigPanel({
 	// Collapse the stored (enableMaestroP, maestroPMode) pair into the tri-state the
 	// segmented "Claude Token Source" selector renders. Source not API => show the
 	// maestro-p path input and the live Time/API-limits pill.
-	const claudeTokenMode = getClaudeTokenMode({ enableMaestroP, maestroPMode });
-	const showMaestroPDetails = claudeTokenMode !== 'api';
+	// Over SSH an unconfigured agent defaults to the TUI (Max plan), so pass the
+	// SSH flag through - getClaudeTokenMode flips the unset default from api to
+	// interactive for remote.
+	const claudeTokenMode = getClaudeTokenMode(
+		{ enableMaestroP, maestroPMode },
+		{ sshEnabled: isSshEnabled }
+	);
+	// SSH-remote agents only offer TUI / API, never Dynamic: the auto-switch
+	// reads a LOCAL usage snapshot that says nothing about the remote account's
+	// quota, so there's no honest signal to switch on. Drop the Dynamic segment
+	// and, when a stored Dynamic value meets SSH, display (and behave) as API -
+	// mirroring resolveClaudeSpawnMode, which falls a dynamic+SSH spawn back to
+	// api. The stored preference is left untouched so disabling SSH restores it.
+	const claudeTokenModeOptions = isSshEnabled
+		? CLAUDE_TOKEN_MODE_OPTIONS.filter((o) => o.value !== 'dynamic')
+		: CLAUDE_TOKEN_MODE_OPTIONS;
+	const displayClaudeTokenMode: ClaudeTokenMode =
+		isSshEnabled && claudeTokenMode === 'dynamic' ? 'api' : claudeTokenMode;
+	const showMaestroPDetails = displayClaudeTokenMode !== 'api';
 	// Track which built-in env var tooltip is showing
 	const [showingTooltip, setShowingTooltip] = useState<string | null>(null);
 
@@ -504,9 +524,11 @@ export function AgentConfigPanel({
 			    spends Claude quota: API (claude --print, per-token), TUI (maestro-p
 			    driving the Claude TUI against the Max plan), or Dynamic (start on the
 			    TUI, fall back to API when the 5-hour or weekly window is near
-			    exhaustion, then snap back once both windows reset). Hidden over SSH:
-			    the wrapper needs the real claude binary on the local machine. */}
-			{agent.id === 'claude-code' && !isSshEnabled && onEnableMaestroPChange && (
+			    exhaustion, then snap back once both windows reset). Over SSH only
+			    API / TUI are offered (Dynamic needs a local quota snapshot that
+			    doesn't reflect the remote account) and maestro-p runs on the remote
+			    host's PATH, so the local Maestro-P Path override is hidden. */}
+			{agent.id === 'claude-code' && onEnableMaestroPChange && (
 				<div
 					className={`${padding} rounded border`}
 					style={{ borderColor: theme.colors.border, backgroundColor: theme.colors.bgMain }}
@@ -536,8 +558,8 @@ export function AgentConfigPanel({
 						)}
 					</div>
 					<ToggleButtonGroup
-						options={CLAUDE_TOKEN_MODE_OPTIONS}
-						value={claudeTokenMode}
+						options={claudeTokenModeOptions}
+						value={displayClaudeTokenMode}
 						onChange={(mode) => {
 							const src = toClaudeTokenModeSource(mode);
 							onEnableMaestroPChange(src.enableMaestroP);
@@ -545,8 +567,15 @@ export function AgentConfigPanel({
 						}}
 						theme={theme}
 					/>
-					<p className="text-xs opacity-50 mt-2">{CLAUDE_TOKEN_MODE_HINTS[claudeTokenMode]}</p>
-					{showMaestroPDetails && (
+					<p className="text-xs opacity-50 mt-2">
+						{CLAUDE_TOKEN_MODE_HINTS[displayClaudeTokenMode]}
+						{isSshEnabled && displayClaudeTokenMode === 'interactive'
+							? ' Runs maestro-p on the remote host (must be on its PATH).'
+							: ''}
+					</p>
+					{/* Local Maestro-P Path override is local-only: over SSH maestro-p
+					    is resolved as a bare command on the remote PATH, so hide it. */}
+					{showMaestroPDetails && !isSshEnabled && (
 						<div className="mt-3">
 							<label
 								className="block text-xs font-medium mb-2"

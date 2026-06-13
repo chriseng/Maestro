@@ -10,7 +10,10 @@ import type { InteractiveReplayController } from '../../agents/claude-interactiv
 import { stripThinkingFromTranscript } from '../../agents/claude-transcript-sanitizer';
 import type { ProcessConfig as ProcessSpawnConfig } from '../../process-manager/types';
 import { logger } from '../../utils/logger';
-import { resolveClaudeSpawnMode } from '../../agents/resolveClaudeSpawnMode';
+import {
+	resolveClaudeSpawnMode,
+	buildRemoteInteractiveSpawn,
+} from '../../agents/resolveClaudeSpawnMode';
 import { getClaudeTokenMode } from '../../../shared/claudeTokenMode';
 import { resolveConfigDirKey } from '../../stores/claudeUsageStore';
 import { isWindows } from '../../../shared/platformDetection';
@@ -259,6 +262,9 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 				// The real claude binary maestro-p should drive, as decided by the
 				// resolver. Consumed by the interactive command swap below.
 				let claudeDecisionRealBinPath: string | undefined;
+				// Interactive resolved for an SSH remote spawn: maestro-p runs on the
+				// remote host (not a local script). Realized in the SSH block below.
+				let claudeResolvedRemote = false;
 				const isClaudeCode =
 					agent?.id === 'claude-code' &&
 					!!agent?.interactiveCommand &&
@@ -286,14 +292,18 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 						}>
 					).find((s) => s?.id === config.sessionId);
 
-					const tokenMode = getClaudeTokenMode({
-						enableMaestroP: persistedSession?.enableMaestroP ?? config.enableMaestroP,
-						// Fall back to the inline config when the persisted lookup misses
-						// (e.g. background synopsis spawns under a synthetic sessionId that
-						// won't match any persisted session, so they forward the token-mode
-						// fields explicitly on the spawn payload).
-						maestroPMode: persistedSession?.maestroPMode ?? config.maestroPMode,
-					});
+					const tokenMode = getClaudeTokenMode(
+						{
+							enableMaestroP: persistedSession?.enableMaestroP ?? config.enableMaestroP,
+							// Fall back to the inline config when the persisted lookup misses
+							// (e.g. background synopsis spawns under a synthetic sessionId that
+							// won't match any persisted session, so they forward the token-mode
+							// fields explicitly on the spawn payload).
+							maestroPMode: persistedSession?.maestroPMode ?? config.maestroPMode,
+						},
+						// Remote agents default to the TUI when the user hasn't chosen.
+						{ sshEnabled: isSshEnabled }
+					);
 
 					const decision = resolveClaudeSpawnMode({
 						agent,
@@ -312,6 +322,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					resolvedMaestroPBinPath = decision.maestroPBinPath;
 					resolvedConfigDirKey = decision.configDirKey;
 					claudeDecisionRealBinPath = decision.claudeRealBinPath;
+					claudeResolvedRemote = !!decision.remote;
 				}
 
 				// Pick the binary and arg list based on the resolved mode. Interactive
@@ -834,8 +845,33 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 						// This completely bypasses shell escaping issues by sending the script via stdin
 						sshRemoteUsed = sshResult.config;
 
+						// Claude interactive/dynamic over SSH: run maestro-p on the remote
+						// host (it strips the headless flags, drives the remote claude TUI
+						// on the Max subscription, and reads the prompt from the stdin
+						// passthrough below) instead of `claude --print`. maestro-p must be
+						// installed on the remote PATH. For the API path this is null and
+						// the spawn stays on the plain claude binary.
+						const remoteInteractive =
+							isClaudeCode && claudeResolvedMode === 'interactive' && claudeResolvedRemote
+								? buildRemoteInteractiveSpawn({
+										decision: {
+											mode: 'interactive',
+											reason: claudeResolvedReason,
+											maestroPBinPath: null,
+											remote: true,
+											claudeRealBinPath: claudeDecisionRealBinPath,
+										},
+										interactiveModeArgs: agent?.interactiveModeArgs,
+										remoteClaudeBin: claudeDecisionRealBinPath,
+									})
+								: null;
+
 						// Determine the command to run on the remote host
-						const remoteCommand = config.sessionCustomPath || agent?.binaryName || config.command;
+						const remoteCommand =
+							remoteInteractive?.command ||
+							config.sessionCustomPath ||
+							agent?.binaryName ||
+							config.command;
 
 						// Build the SSH command with stdin script
 						// The script contains PATH setup, cd, env vars, and the actual command
@@ -859,7 +895,12 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 						//   temp files on the remote host via the SSH script, then passed as CLI args
 						//   (e.g., -i /tmp/image.png for Codex, -f /tmp/image.png for OpenCode).
 						const hasImages = config.images && config.images.length > 0;
-						let sshArgs = finalArgs;
+						// Prepend the interactive flags ahead of the headless arg list when
+						// running maestro-p on the remote (it forwards the interactive flags
+						// to the TUI and strips the headless ones). No-op for the API path.
+						let sshArgs = remoteInteractive
+							? [...remoteInteractive.prependArgs, ...finalArgs]
+							: finalArgs;
 						let stdinInput: string | undefined = effectivePrompt;
 
 						if (hasImages && effectivePrompt && agent?.capabilities?.supportsStreamJsonInput) {
@@ -882,8 +923,14 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 							config.agentSessionId;
 
 						// Merge global environment variables with session custom env vars
-						// Session vars take precedence over global vars
-						const mergedSshEnvVars = { ...globalShellEnvVars, ...(effectiveCustomEnvVars || {}) };
+						// Session vars take precedence over global vars. Remote interactive
+						// adds MAESTRO_CLAUDE_BIN only when a custom remote claude path is
+						// set (otherwise maestro-p defaults to `claude` on the remote PATH).
+						const mergedSshEnvVars = {
+							...globalShellEnvVars,
+							...(effectiveCustomEnvVars || {}),
+							...(remoteInteractive?.env || {}),
+						};
 
 						const sshCommand = await buildSshCommandWithStdin(sshResult.config, {
 							command: remoteCommand,

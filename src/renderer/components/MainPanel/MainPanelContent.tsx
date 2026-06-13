@@ -8,7 +8,7 @@ import {
 	createTabPidChangeHandler,
 } from '../TerminalView';
 import { InputArea } from '../InputArea';
-import { FilePreview, type FilePreviewHandle } from '../FilePreview';
+import type { FilePreviewHandle } from '../FilePreview';
 import { WizardConversationView, DocumentGenerationView } from '../InlineWizard';
 import { BrowserTabView, type BrowserTabViewHandle } from './BrowserTabView';
 import { useBrowserTabMounting } from '../../hooks/browser/useBrowserTabMounting';
@@ -36,6 +36,17 @@ import type {
 	GroomingProgress,
 	MergeResult,
 } from '../../types/contextMerge';
+
+// Lazy-loaded: FilePreview is the single aggregation point that pulls mermaid,
+// react-syntax-highlighter, and the full react-markdown/remark/rehype stack into
+// the bundle. None of it is needed until the user actually opens a file-preview
+// tab (never on a fresh launch landing on an AI tab), so we code-split it behind
+// first open to cut cold-start cost and idle memory. React.lazy preserves ref
+// forwarding through FilePreview's memo()+forwardRef wrapper, so filePreviewRef
+// keeps working once the chunk has mounted.
+const FilePreview = React.lazy(() =>
+	import('../FilePreview').then((m) => ({ default: m.FilePreview }))
+);
 
 export interface MainPanelContentProps {
 	// Core state (guaranteed by parent guard)
@@ -510,66 +521,68 @@ export const MainPanelContent = React.memo(function MainPanelContent(props: Main
 					tabIndex={-1}
 					className="flex-1 overflow-hidden outline-none"
 				>
-					<FilePreview
-						ref={filePreviewRef}
-						file={memoizedFilePreviewFile}
-						onClose={handleFilePreviewClose}
-						isTabMode={true}
-						theme={theme}
-						markdownEditMode={activeFileTab.editMode}
-						setMarkdownEditMode={handleFilePreviewEditModeChange}
-						onSave={handleFilePreviewSave}
-						shortcuts={shortcuts}
-						fileTree={fileTree}
-						cwd={filePreviewCwd}
-						onFileClick={onFileClick}
-						// Per-tab navigation history for breadcrumb navigation
-						canGoBack={canGoBack}
-						canGoForward={canGoForward}
-						onNavigateBack={onNavigateBack}
-						onNavigateForward={onNavigateForward}
-						backHistory={backHistory}
-						forwardHistory={forwardHistory}
-						currentHistoryIndex={currentHistoryIndex}
-						onNavigateToIndex={onNavigateToIndex}
-						onOpenFuzzySearch={onOpenFuzzySearch}
-						onShortcutUsed={onShortcutUsed}
-						ghCliAvailable={ghCliAvailable}
-						onPublishGist={onPublishGist}
-						hasGist={hasGist}
-						onOpenInGraph={onOpenInGraph}
-						onOpenInBrowser={onOpenInBrowser}
-						sshRemoteId={filePreviewSshRemoteId}
-						// Pass external edit content for persistence across tab switches
-						externalEditContent={activeFileTab.editContent}
-						onEditContentChange={handleFilePreviewEditContentChange}
-						// Pass scroll position props for persistence across tab switches
-						initialScrollTop={activeFileTab.scrollTop}
-						onScrollPositionChange={handleFilePreviewScrollPositionChange}
-						// Pass search query props for persistence across tab switches
-						initialSearchQuery={activeFileTab.searchQuery}
-						onSearchQueryChange={handleFilePreviewSearchQueryChange}
-						// File change detection
-						lastModified={activeFileTab.lastModified}
-						onReloadFile={handleFilePreviewReload}
-						// Phase 2: per-tab preview tier override.
-						previewTierOverride={activeFileTab.previewTierOverride}
-						onPreviewTierChange={(tier) =>
-							useTabStore.getState().setFileTabPreviewTier(activeFileTabId, tier)
-						}
-						// HTML render mode (per-tab, persists across tab switches).
-						htmlRenderMode={activeFileTab.htmlRenderMode}
-						onHtmlRenderModeChange={(value) =>
-							useTabStore.getState().setFileTabHtmlRenderMode(activeFileTabId, value)
-						}
-						// Transient deep-link scroll target. FilePreview clears this
-						// via onPendingScrollToLineConsumed once the editor has
-						// jumped, so subsequent re-renders don't re-scroll.
-						pendingScrollToLine={activeFileTab.pendingScrollToLine}
-						onPendingScrollToLineConsumed={() =>
-							useTabStore.getState().clearFileTabPendingScrollToLine(activeFileTabId)
-						}
-					/>
+					<React.Suspense fallback={null}>
+						<FilePreview
+							ref={filePreviewRef}
+							file={memoizedFilePreviewFile}
+							onClose={handleFilePreviewClose}
+							isTabMode={true}
+							theme={theme}
+							markdownEditMode={activeFileTab.editMode}
+							setMarkdownEditMode={handleFilePreviewEditModeChange}
+							onSave={handleFilePreviewSave}
+							shortcuts={shortcuts}
+							fileTree={fileTree}
+							cwd={filePreviewCwd}
+							onFileClick={onFileClick}
+							// Per-tab navigation history for breadcrumb navigation
+							canGoBack={canGoBack}
+							canGoForward={canGoForward}
+							onNavigateBack={onNavigateBack}
+							onNavigateForward={onNavigateForward}
+							backHistory={backHistory}
+							forwardHistory={forwardHistory}
+							currentHistoryIndex={currentHistoryIndex}
+							onNavigateToIndex={onNavigateToIndex}
+							onOpenFuzzySearch={onOpenFuzzySearch}
+							onShortcutUsed={onShortcutUsed}
+							ghCliAvailable={ghCliAvailable}
+							onPublishGist={onPublishGist}
+							hasGist={hasGist}
+							onOpenInGraph={onOpenInGraph}
+							onOpenInBrowser={onOpenInBrowser}
+							sshRemoteId={filePreviewSshRemoteId}
+							// Pass external edit content for persistence across tab switches
+							externalEditContent={activeFileTab.editContent}
+							onEditContentChange={handleFilePreviewEditContentChange}
+							// Pass scroll position props for persistence across tab switches
+							initialScrollTop={activeFileTab.scrollTop}
+							onScrollPositionChange={handleFilePreviewScrollPositionChange}
+							// Pass search query props for persistence across tab switches
+							initialSearchQuery={activeFileTab.searchQuery}
+							onSearchQueryChange={handleFilePreviewSearchQueryChange}
+							// File change detection
+							lastModified={activeFileTab.lastModified}
+							onReloadFile={handleFilePreviewReload}
+							// Phase 2: per-tab preview tier override.
+							previewTierOverride={activeFileTab.previewTierOverride}
+							onPreviewTierChange={(tier) =>
+								useTabStore.getState().setFileTabPreviewTier(activeFileTabId, tier)
+							}
+							// HTML render mode (per-tab, persists across tab switches).
+							htmlRenderMode={activeFileTab.htmlRenderMode}
+							onHtmlRenderModeChange={(value) =>
+								useTabStore.getState().setFileTabHtmlRenderMode(activeFileTabId, value)
+							}
+							// Transient deep-link scroll target. FilePreview clears this
+							// via onPendingScrollToLineConsumed once the editor has
+							// jumped, so subsequent re-renders don't re-scroll.
+							pendingScrollToLine={activeFileTab.pendingScrollToLine}
+							onPendingScrollToLineConsumed={() =>
+								useTabStore.getState().clearFileTabPendingScrollToLine(activeFileTabId)
+							}
+						/>
+					</React.Suspense>
 				</div>
 			) : (
 				<>

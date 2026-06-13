@@ -12,7 +12,11 @@ import { getAgentDefinition, getAgentCapabilities } from '../agents';
 import { buildAgentArgs, applyAgentConfigOverrides } from '../utils/agent-args';
 import { wrapSpawnWithSsh, type SshSpawnWrapConfig } from '../utils/ssh-spawn-wrapper';
 import { sanitizeCustomEnvVars } from './cue-env-sanitizer';
-import { resolveClaudeSpawnMode, applyClaudeSpawnDecision } from '../agents/resolveClaudeSpawnMode';
+import {
+	resolveClaudeSpawnMode,
+	applyClaudeSpawnDecision,
+	buildRemoteInteractiveSpawn,
+} from '../agents/resolveClaudeSpawnMode';
 import { getClaudeTokenMode } from '../../shared/claudeTokenMode';
 
 // ─── Types ──────���────────────────────────────────────────────────────────────
@@ -143,10 +147,14 @@ export async function buildSpawnSpec(
 	// maestro-p's "prompt is the trailing positional" contract stays intact.
 	// SSH spawns resolve to `api` (the resolver short-circuits on sshEnabled),
 	// because maestro-p needs the local TUI and SSH runs `claude --print`.
-	const tokenMode = getClaudeTokenMode({
-		enableMaestroP: config.enableMaestroP,
-		maestroPMode: config.maestroPMode,
-	});
+	const tokenMode = getClaudeTokenMode(
+		{
+			enableMaestroP: config.enableMaestroP,
+			maestroPMode: config.maestroPMode,
+		},
+		// Remote agents default to the TUI when the user hasn't chosen.
+		{ sshEnabled: !!sshRemoteConfig?.enabled }
+	);
 	const claudeSpawnDecision = resolveClaudeSpawnMode({
 		agent: {
 			id: agentDef.id,
@@ -165,13 +173,25 @@ export async function buildSpawnSpec(
 
 	// 4. Apply SSH wrapping if configured
 	if (sshRemoteConfig?.enabled && sshStore) {
+		// Claude interactive/dynamic over SSH runs maestro-p on the remote host
+		// (must be on its PATH) to drive the remote TUI on the Max subscription,
+		// honoring the Cue run's configured timeout as the idle budget. Returns
+		// null for the API path, leaving the SSH config on the plain claude binary.
+		const remoteInteractive = buildRemoteInteractiveSpawn({
+			decision: claudeSpawnDecision,
+			interactiveModeArgs: agentDef.interactiveModeArgs,
+			remoteClaudeBin: claudeSpawnDecision.claudeRealBinPath,
+			maxWaitSeconds: Math.ceil(config.timeoutMs / 1000),
+		});
 		const sshWrapConfig: SshSpawnWrapConfig = {
 			command,
-			args: finalArgs,
+			args: remoteInteractive ? [...remoteInteractive.prependArgs, ...finalArgs] : finalArgs,
 			cwd: projectRoot,
 			prompt: substitutedPrompt,
-			customEnvVars: effectiveEnvVars,
-			agentBinaryName: agentDef.binaryName,
+			customEnvVars: remoteInteractive
+				? { ...effectiveEnvVars, ...remoteInteractive.env }
+				: effectiveEnvVars,
+			agentBinaryName: remoteInteractive ? remoteInteractive.command : agentDef.binaryName,
 			promptArgs: agentDef.promptArgs,
 			noPromptSeparator: agentDef.noPromptSeparator,
 		};

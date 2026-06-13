@@ -43,6 +43,7 @@ import { useMessageGistStore } from '../stores/messageGistStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { SessionRecoveryCard } from './SessionRecoveryCard';
 import { getTokenSourcePill } from '../../shared/claudeTokenModeLabel';
+import { getClaudeTokenMode } from '../../shared/claudeTokenMode';
 
 // ============================================================================
 // Tool display helpers (pure functions, hoisted out of render path)
@@ -2331,7 +2332,7 @@ export const TerminalOutput = memo(
 							bionifyAlgorithm={globalBionifyAlgorithm}
 							userMessageAlignment={userMessageAlignment}
 							isClaudeCode={session.toolType === 'claude-code'}
-							isAdaptiveMode={session.enableMaestroP === true}
+							isAdaptiveMode={getClaudeTokenMode(session) === 'dynamic'}
 						/>
 					))}
 
