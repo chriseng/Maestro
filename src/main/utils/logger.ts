@@ -84,7 +84,15 @@ class Logger extends EventEmitter {
 	}
 
 	private createLogFileStream(filePath: string): fs.WriteStream {
-		const stream = fs.createWriteStream(filePath, { flags: 'a' });
+		const fd = fs.openSync(filePath, 'a');
+		let stream: fs.WriteStream;
+
+		try {
+			stream = fs.createWriteStream(filePath, { fd, autoClose: true });
+		} catch (error) {
+			fs.closeSync(fd);
+			throw error;
+		}
 
 		stream.on('error', (error) => {
 			if (this.logFileStream === stream) {
