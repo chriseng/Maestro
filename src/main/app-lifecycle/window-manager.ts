@@ -558,11 +558,22 @@ export function createWindowManager(deps: WindowManagerDependencies): WindowMana
 					exitCode: details.exitCode,
 				});
 
-				// Report to Sentry from main process (always available)
-				reportCrashToSentry(`Renderer process gone: ${details.reason}`, 'fatal', {
-					reason: details.reason,
-					exitCode: details.exitCode,
-				});
+				// `killed` (signal-terminated, e.g. app quit / OS shutdown / user
+				// force-quit) and `clean-exit` are intentional terminations, not
+				// crashes - the auto-reload guard below already treats them as such.
+				// Reporting them as `fatal` Sentry events is pure noise; genuine
+				// out-of-memory kills surface separately as reason `oom`. Only the
+				// real crash reasons (`crashed`, `oom`, `abnormal-exit`, etc.) are
+				// worth a breadcrumb. Fixes MAESTRO-4X/4Y.
+				const intentionalTermination =
+					details.reason === 'killed' || details.reason === 'clean-exit';
+				if (!intentionalTermination) {
+					// Report to Sentry from main process (always available)
+					reportCrashToSentry(`Renderer process gone: ${details.reason}`, 'fatal', {
+						reason: details.reason,
+						exitCode: details.exitCode,
+					});
+				}
 
 				// Auto-reload unless the process was intentionally killed
 				if (details.reason !== 'killed' && details.reason !== 'clean-exit') {

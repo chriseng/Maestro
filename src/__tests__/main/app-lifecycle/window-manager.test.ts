@@ -115,6 +115,14 @@ vi.mock('electron-devtools-installer', () => ({
 	REACT_DEVELOPER_TOOLS: 'REACT_DEVELOPER_TOOLS',
 }));
 
+// Mock Sentry main so we can assert which renderer terminations get reported.
+const { sentryCaptureMessageMock } = vi.hoisted(() => ({
+	sentryCaptureMessageMock: vi.fn(),
+}));
+vi.mock('@sentry/electron/main', () => ({
+	captureMessage: sentryCaptureMessageMock,
+}));
+
 describe('app-lifecycle/window-manager', () => {
 	let mockWindowStateStore: {
 		store: {
@@ -1435,6 +1443,48 @@ describe('app-lifecycle/window-manager', () => {
 				windowManager.createWindow();
 
 				expect(webContentsEventHandlers.has('crashed')).toBe(false);
+			});
+
+			async function fireRenderProcessGone(reason: string, exitCode: number) {
+				const { createWindowManager } = await import('../../../main/app-lifecycle/window-manager');
+				const windowManager = createWindowManager({
+					windowStateStore: mockWindowStateStore as unknown as Parameters<
+						typeof createWindowManager
+					>[0]['windowStateStore'],
+					isDevelopment: false,
+					preloadPath: '/path/to/preload.js',
+					rendererProductionUrl: 'app://app/index.html',
+					devServerUrl: 'http://localhost:5173',
+					useNativeTitleBar: false,
+					autoHideMenuBar: false,
+				});
+				windowManager.createWindow();
+				const handler = webContentsEventHandlers.get('render-process-gone');
+				handler?.({}, { reason, exitCode });
+			}
+
+			// MAESTRO-4X/4Y: intentional terminations (signal-killed / clean exit)
+			// must not be reported as fatal crashes - that buries real crashes.
+			it('does not report Sentry for an intentionally killed renderer (MAESTRO-4X)', async () => {
+				await fireRenderProcessGone('killed', 15);
+				await Promise.resolve();
+				expect(sentryCaptureMessageMock).not.toHaveBeenCalled();
+			});
+
+			it('does not report Sentry for a clean-exit renderer', async () => {
+				await fireRenderProcessGone('clean-exit', 0);
+				await Promise.resolve();
+				expect(sentryCaptureMessageMock).not.toHaveBeenCalled();
+			});
+
+			it('reports Sentry for a genuine renderer crash', async () => {
+				await fireRenderProcessGone('crashed', 139);
+				await vi.waitFor(() =>
+					expect(sentryCaptureMessageMock).toHaveBeenCalledWith(
+						'Renderer process gone: crashed',
+						expect.objectContaining({ level: 'fatal' })
+					)
+				);
 			});
 		});
 	});
