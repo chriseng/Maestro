@@ -1802,13 +1802,27 @@ export const FilePreview = React.memo(
 								// CodeMirror's defaultKeymap already binds Cmd/Ctrl+ArrowUp/Down
 								// to doc start/end, PageUp/PageDown for paging, and the usual
 								// selection / word-jump shortcuts — no need to reimplement them
-								// against a textarea ref. We only intercept the two app-level
-								// shortcuts (save, exit edit mode).
+								// against a textarea ref. We only intercept the app-level
+								// shortcuts (save, exit edit mode, toggle preview/edit).
+								//
+								// `e` here is a native KeyboardEvent forwarded by CodeMirror's
+								// dom handler. isShortcut only reads modifier/key fields that
+								// exist on both native and React events, so the cast is safe.
 								if (e.key === 's' && (e.metaKey || e.ctrlKey)) {
 									e.preventDefault();
 									e.stopPropagation();
 									handleSave();
 								} else if (e.key === 'Escape') {
+									e.preventDefault();
+									e.stopPropagation();
+									setMarkdownEditMode(false);
+								} else if (isShortcut(e as unknown as React.KeyboardEvent, 'toggleMarkdownMode')) {
+									// Handle the toggle here too: while the CodeMirror
+									// contenteditable holds focus, relying on the keydown to
+									// bubble out to the container handler is unreliable, so the
+									// editor → preview direction would silently no-op until the
+									// user clicked elsewhere. Toggling directly keeps Cmd+E
+									// working both ways without a focus round-trip.
 									e.preventDefault();
 									e.stopPropagation();
 									setMarkdownEditMode(false);

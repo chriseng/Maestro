@@ -270,6 +270,12 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(function XT
 	// gate added in commit 83e53fb75) leaks one subscription and root-holds the
 	// addon for GC. Tracked separately so the cleanup path can drop it.
 	const webglCtxLossDisposableRef = useRef<{ dispose: () => void } | null>(null);
+	// Consecutive WebGL context losses since the tab was last (re)activated. A lost
+	// context that immediately dies again on re-init (seen on some Windows ANGLE/D3D
+	// drivers) would otherwise loop dispose→re-init→loss forever; after a couple of
+	// failures we stop re-initialising and let xterm's DOM renderer take over. Reset
+	// to 0 when the tab becomes active again so a healthy visit gets WebGL back.
+	const webglContextLossCountRef = useRef(0);
 
 	// Link context menu state
 	const [linkMenu, setLinkMenu] = useState<LinkContextMenuState | null>(null);
@@ -393,6 +399,50 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(function XT
 		}, 100);
 	}, [sessionId, onResize]);
 
+	// Create a WebGL renderer, wire its context-loss recovery, and attach it to the
+	// terminal. Shared by the initial load, tab reactivation, and post-loss recovery
+	// so the recovery behaviour lives in exactly one place (previously duplicated, with
+	// the re-init copy missing the repaint fix below).
+	//
+	// On context loss a disposed WebGL renderer leaves the viewport blank: xterm does
+	// not repaint on its own and a bare term.refresh() cannot redraw the dead canvas.
+	// We re-attach a renderer on the next frame so the buffer is drawn again; without
+	// this the terminal stays blank (shell still alive) until the next tab switch. This
+	// is the root cause of issue #1073, which surfaces on Windows ANGLE where the GL
+	// context is lost on tab/panel visibility flips. Re-init is capped (see
+	// webglContextLossCountRef) so a context that keeps dying settles on xterm's DOM
+	// renderer instead of looping dispose→re-init→loss.
+	const attachWebglRenderer = useCallback(
+		(WebglAddon: typeof import('@xterm/addon-webgl').WebglAddon, term: Terminal) => {
+			const addon = new WebglAddon();
+			// Capture the disposable so the cleanup path (and the inactive branch of the
+			// isActive effect) can drop the subscription before discarding the addon.
+			// Without this, every re-init leaks an EventEmitter slot.
+			const ctxLossDisposable = addon.onContextLoss(() => {
+				logger.warn('[XTerminal] WebGL context lost — recovering renderer');
+				ctxLossDisposable.dispose();
+				webglCtxLossDisposableRef.current = null;
+				addon.dispose();
+				webglAddonRef.current = null;
+				requestAnimationFrame(() => {
+					const c = containerRef.current;
+					if (!c || c.offsetWidth === 0 || c.offsetHeight === 0) return;
+					if (webglCtorRef.current && webglContextLossCountRef.current < 2) {
+						webglContextLossCountRef.current += 1;
+						attachWebglRenderer(webglCtorRef.current, term);
+					}
+					fitAddonRef.current?.fit();
+					term.refresh(0, term.rows - 1);
+				});
+			});
+			term.loadAddon(addon);
+			webglAddonRef.current = addon;
+			webglCtxLossDisposableRef.current = ctxLossDisposable;
+			webglCtorRef.current = WebglAddon;
+		},
+		[]
+	);
+
 	// Initialize terminal
 	useEffect(() => {
 		if (!containerRef.current) return;
@@ -487,23 +537,7 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(function XT
 			}
 			pendingWebglLoadRef.current = null;
 			try {
-				const addon = new WebglAddon();
-				// Capture the disposable so the cleanup path (and the inactive branch
-				// of the isActive effect) can drop the subscription before discarding
-				// the addon. Without this, every re-init leaks an EventEmitter slot.
-				const ctxLossDisposable = addon.onContextLoss(() => {
-					logger.warn('[XTerminal] WebGL context lost — falling back to canvas renderer');
-					ctxLossDisposable.dispose();
-					webglCtxLossDisposableRef.current = null;
-					addon.dispose();
-					webglAddonRef.current = null;
-					// Force a full repaint so the fallback canvas renderer draws from the internal buffer.
-					term.refresh(0, term.rows - 1);
-				});
-				term.loadAddon(addon);
-				webglAddonRef.current = addon;
-				webglCtxLossDisposableRef.current = ctxLossDisposable;
-				webglCtorRef.current = WebglAddon;
+				attachWebglRenderer(WebglAddon, term);
 			} catch (err) {
 				logger.warn(
 					'[XTerminal] WebGL addon failed to load, using canvas renderer:',
@@ -727,23 +761,14 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(function XT
 				webglAddonRef.current = null;
 			}
 		} else {
-			// Becoming active — re-init WebGL if we have the constructor cached
+			// Becoming active — re-init WebGL if we have the constructor cached.
 			if (!webglAddonRef.current && webglCtorRef.current) {
+				// Fresh visit: let the context-loss recovery try WebGL again from scratch.
+				webglContextLossCountRef.current = 0;
 				const container = containerRef.current;
 				if (container && container.offsetWidth > 0 && container.offsetHeight > 0) {
 					try {
-						const addon = new webglCtorRef.current();
-						const ctxLossDisposable = addon.onContextLoss(() => {
-							logger.warn('[XTerminal] WebGL context lost — falling back to canvas renderer');
-							ctxLossDisposable.dispose();
-							webglCtxLossDisposableRef.current = null;
-							addon.dispose();
-							webglAddonRef.current = null;
-							term.refresh(0, term.rows - 1);
-						});
-						term.loadAddon(addon);
-						webglAddonRef.current = addon;
-						webglCtxLossDisposableRef.current = ctxLossDisposable;
+						attachWebglRenderer(webglCtorRef.current, term);
 					} catch {
 						// WebGL re-init failed — canvas renderer remains active
 					}
@@ -752,7 +777,7 @@ export const XTerminal = forwardRef<XTerminalHandle, XTerminalProps>(function XT
 				term.refresh(0, term.rows - 1);
 			}
 		}
-	}, [isActive]);
+	}, [isActive, attachWebglRenderer]);
 
 	const dismissLinkMenu = useCallback(() => setLinkMenu(null), []);
 	const dismissSelectionMenu = useCallback(() => setSelectionMenu(null), []);
