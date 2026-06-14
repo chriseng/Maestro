@@ -13,6 +13,28 @@ Maestro can update itself automatically! This feature was introduced in **v0.8.7
 
 ---
 
+## v0.17.x - Maestro Cue
+
+**Latest: v0.17.0** | Released January 1, 1
+
+# Major 0.17.x Additions
+
+🪄 Maestro Cue is a new trigger-based cross-agent orchestration capability that lets heartbeats, GitHub issues/PRs, file system monitors, and other data sources bring your agents to life and pass work between one another.
+
+💻 Full-featured xterm.js terminal tabs sit alongside your AI and file preview tabs, with support for opening and renaming multiple terminals.
+
+🧑‍✈️ GitHub Copilot-CLI joins Maestro as a first-class agent with end-to-end integration for both local and remote (over SSH) execution.
+
+🌐 The web/mobile interface gained real PTY terminals, swipeable panels, notification dropdowns, and dozens of desktop-equivalent features for a full touch-friendly experience on tablets and phones.
+
+🔗 SSH Shared History synchronizes Maestro instances working on the same project, with each host writing per-hostname JSONL files to `.maestro/history/` on the remote so participants see each other's work.
+
+🌍 Browser tabs open web pages directly inside Maestro as first-class tabs with a full address bar, navigation controls, session persistence across restarts, and bulk close support.
+
+## Other Changes in 0.17.0
+
+---
+
 ## v0.15.x - Maestro Symphony
 
 **Latest: v0.15.3** | Released April 5, 2026
