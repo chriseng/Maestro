@@ -17,6 +17,7 @@ import {
 import { getClaudeTokenMode } from '../../../shared/claudeTokenMode';
 import { resolveConfigDirKey } from '../../stores/claudeUsageStore';
 import { isWindows } from '../../../shared/platformDetection';
+import { REGEX_AI_SUFFIX } from '../../constants';
 import { getChildProcesses } from '../../process-manager/utils/childProcessInfo';
 import { addBreadcrumb, captureException } from '../../utils/sentry';
 import { isWebContentsAvailable } from '../../utils/safe-send';
@@ -271,6 +272,18 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					!!agent?.interactiveCommand &&
 					!!agent?.interactiveModeArgs;
 				const isSshEnabled = !!config.sessionSshRemoteConfig?.enabled;
+				// Desktop turns spawn with a COMPOUND session id (`{agentId}-ai-{tabId}`,
+				// built in agentStore.processQueuedItem), but persisted session records are
+				// keyed by the bare agent id. Strip the `-ai-…` suffix so both the token-mode
+				// lookup and the `claudeInteractive` write-back below match the right record.
+				// Without this every desktop claude-code turn missed the persisted record,
+				// fell through to the inline `config.enableMaestroP` (which the desktop caller
+				// never sends), and silently resolved to `api` (`claude --print`) even when the
+				// agent was set to TUI/Dynamic. Background surfaces (tab naming, synopsis, group
+				// chat, Cue) pass their token-mode fields inline, so they were unaffected. The
+				// renderer mirror (`process:claude-mode-resolved`) already strips this suffix on
+				// its side, so it still receives `config.sessionId` unchanged.
+				const baseSessionId = config.sessionId.replace(REGEX_AI_SUFFIX, '');
 				// Resolve the Claude token source (maestro-p TUI vs `claude --print`)
 				// through the shared resolver. Token-mode fields are read from the
 				// persisted session record (authoritative) with the spawn payload as
@@ -291,7 +304,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 								modeReason?: 'auto' | 'limit';
 							};
 						}>
-					).find((s) => s?.id === config.sessionId);
+					).find((s) => s?.id === baseSessionId);
 
 					// Over SSH, warm the remote maestro-p probe BEFORE resolving so the
 					// resolver's TUI->API backstop fires on the very first spawn - the
@@ -748,7 +761,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 						>;
 						let mutated = false;
 						const nextSessions = allSessions.map((s) => {
-							if (s?.id !== config.sessionId) return s;
+							if (s?.id !== baseSessionId) return s;
 							const current = s.claudeInteractive as
 								| {
 										mode?: string;
@@ -1118,7 +1131,12 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 									id?: string;
 									aiTabs?: Array<{ id?: string; agentSessionId?: string | null }>;
 								}>;
-								const ownerSession = sessions.find((s) => s?.id === originalConfig.sessionId);
+								// Same compound-id caveat as the token-mode lookup above: the
+								// replay config carries the `{agentId}-ai-{tabId}` spawn id, but
+								// sessions are keyed by the bare agent id. Strip the suffix or the
+								// owner lookup misses and we never pick up the fresh agentSessionId.
+								const ownerSessionId = originalConfig.sessionId.replace(REGEX_AI_SUFFIX, '');
+								const ownerSession = sessions.find((s) => s?.id === ownerSessionId);
 								const targetTab = ownerSession?.aiTabs?.find((t) => t?.id === originalConfig.tabId);
 								if (targetTab?.agentSessionId) {
 									freshAgentSessionId = targetTab.agentSessionId;
