@@ -47,6 +47,29 @@ describe('JsonEmitter', () => {
 		});
 	}
 
+	describe('writeLine EPIPE handling', () => {
+		it('swallows EPIPE when the stdout reader has gone (no crash)', () => {
+			const epipe = Object.assign(new Error('write EPIPE'), { code: 'EPIPE' });
+			writeSpy.mockImplementation((() => {
+				throw epipe;
+			}) as typeof process.stdout.write);
+			const emitter = new JsonEmitter();
+			// emitInit emits through writeLine; a dead pipe must not crash maestro-p.
+			expect(() => emitter.emitInit({ sessionId: 'abc', model: null, cwd: '/cwd' })).not.toThrow();
+		});
+
+		it('re-throws write errors that are not a dead pipe', () => {
+			const boom = Object.assign(new Error('disk full'), { code: 'ENOSPC' });
+			writeSpy.mockImplementation((() => {
+				throw boom;
+			}) as typeof process.stdout.write);
+			const emitter = new JsonEmitter();
+			expect(() => emitter.emitInit({ sessionId: 'abc', model: null, cwd: '/cwd' })).toThrow(
+				/disk full/
+			);
+		});
+	});
+
 	describe('emitInit', () => {
 		it('writes one system/init envelope with the supplied fields', () => {
 			const emitter = new JsonEmitter();

@@ -151,6 +151,19 @@ export class JsonEmitter {
 	}
 
 	private writeLine(obj: unknown): void {
-		process.stdout.write(`${JSON.stringify(obj)}\n`);
+		try {
+			process.stdout.write(`${JSON.stringify(obj)}\n`);
+		} catch (err) {
+			// The desktop (our stdout reader) can disappear mid-turn - the user
+			// interrupts, closes the tab, or the process is killed. The next write
+			// then fails with EPIPE, which Node surfaces synchronously here. There is
+			// nothing left to emit to, so swallow it instead of crashing maestro-p
+			// (under ELECTRON_RUN_AS_NODE an uncaught throw pops Electron's GUI error
+			// dialog). Re-throw anything that isn't a dead-pipe condition.
+			const code = (err as NodeJS.ErrnoException)?.code;
+			if (code !== 'EPIPE' && code !== 'ERR_STREAM_DESTROYED') {
+				throw err;
+			}
+		}
 	}
 }

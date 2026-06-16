@@ -718,6 +718,20 @@ async function main(): Promise<void> {
 	await runMode(args);
 }
 
+// A dead stdout/stderr reader (the desktop interrupted the turn, closed the tab,
+// or killed us) surfaces as an async EPIPE on the stream. With no listener Node
+// promotes it to an uncaught exception - and because maestro-p runs under
+// ELECTRON_RUN_AS_NODE that pops Electron's GUI "A JavaScript error occurred in
+// the main process" dialog. There's nothing left to write to, so exit quietly.
+for (const stream of [process.stdout, process.stderr]) {
+	stream.on('error', (err: NodeJS.ErrnoException) => {
+		if (err?.code === 'EPIPE' || err?.code === 'ERR_STREAM_DESTROYED') {
+			process.exit(0);
+		}
+		throw err;
+	});
+}
+
 main().catch((err) => {
 	const message = err instanceof Error ? err.message : String(err);
 	process.stderr.write(`maestro-p: ${message}\n`);
