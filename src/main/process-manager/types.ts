@@ -42,6 +42,9 @@ export interface ProcessConfig {
 	promptAlreadyInArgs?: boolean;
 	/** Script to send via stdin for SSH execution (bypasses shell escaping) */
 	sshStdinScript?: string;
+	/** Human-readable remote command line (the actual agent invocation running on the
+	 *  remote host). Surfaced in Process Details above the local SSH command. */
+	sshRemoteCommand?: string;
 	/** PTY terminal width in columns (default 80) */
 	cols?: number;
 	/** PTY terminal height in rows (default 24) */
@@ -106,6 +109,9 @@ export interface ManagedProcess {
 	projectPath?: string;
 	sshRemoteId?: string;
 	sshRemoteHost?: string;
+	/** Human-readable remote command line for SSH spawns (the agent invocation that
+	 *  runs on the remote host). Shown in Process Details above the local SSH command. */
+	sshRemoteCommand?: string;
 	dataBuffer?: string;
 	dataBufferTimeout?: NodeJS.Timeout;
 	/** Env vars Maestro explicitly set on this process (global + agent + session overrides),

@@ -9,6 +9,7 @@ import {
 	FolderOpen,
 	Hash,
 	Play,
+	Server,
 	Tag,
 	Terminal,
 	Variable,
@@ -379,7 +380,39 @@ export function ProcessDetailView({ theme, detail, onBack, onClose }: ProcessDet
 						</code>
 					</div>
 
-					{/* Command Line — full width (very long) */}
+					{/* Remote Command — full width. Shown only for SSH spawns: the actual agent
+					    invocation running on the remote host, displayed above the local SSH
+					    command line below so it's clear what is executing remotely. */}
+					{detail.sshRemoteCommand && (
+						<div
+							className="col-span-2 lg:col-span-4 p-4 rounded-lg"
+							style={{ backgroundColor: theme.colors.bgMain }}
+						>
+							<div className="flex items-center gap-2 mb-2">
+								<Server className="w-4 h-4" style={{ color: theme.colors.accent }} />
+								<span
+									className="text-xs font-medium uppercase tracking-wide"
+									style={{ color: theme.colors.textDim }}
+								>
+									Remote Command
+								</span>
+							</div>
+							<code
+								className="text-sm font-mono break-all block whitespace-pre-wrap overflow-y-auto"
+								style={{
+									color: theme.colors.textMain,
+									userSelect: 'text',
+									cursor: 'text',
+									maxHeight: '300px',
+								}}
+							>
+								{detail.sshRemoteCommand}
+							</code>
+						</div>
+					)}
+
+					{/* Command Line — full width (very long). For SSH spawns this is the local
+					    `ssh ... /bin/bash` invocation; the remote agent command is shown above. */}
 					<div
 						className="col-span-2 lg:col-span-4 p-4 rounded-lg"
 						style={{ backgroundColor: theme.colors.bgMain }}
@@ -390,7 +423,7 @@ export function ProcessDetailView({ theme, detail, onBack, onClose }: ProcessDet
 								className="text-xs font-medium uppercase tracking-wide"
 								style={{ color: theme.colors.textDim }}
 							>
-								Command Line
+								{detail.sshRemoteCommand ? 'SSH Command' : 'Command Line'}
 							</span>
 						</div>
 						<code

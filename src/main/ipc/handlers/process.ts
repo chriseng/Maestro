@@ -119,6 +119,8 @@ export interface CueProcessEntry {
 	sessionName: string;
 	subscriptionName: string;
 	eventType: string;
+	/** For SSH spawns: the agent invocation running on the remote host. */
+	sshRemoteCommand?: string;
 }
 
 export interface ProcessHandlerDependencies {
@@ -734,6 +736,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 				let sshRemoteUsed: SshRemoteConfig | null = null;
 				let customEnvVarsToPass: Record<string, string> | undefined = effectiveCustomEnvVars;
 				let sshStdinScript: string | undefined;
+				let sshRemoteCommand: string | undefined;
 
 				// When interactive mode resolved, thread the underlying claude binary
 				// through `MAESTRO_CLAUDE_BIN` so maestro-p knows which TUI to drive.
@@ -1031,6 +1034,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 						commandToSpawn = sshCommand.command;
 						argsToSpawn = sshCommand.args;
 						sshStdinScript = sshCommand.stdinScript;
+						sshRemoteCommand = sshCommand.remoteCommandLine;
 
 						// For SSH, env vars are passed in the stdin script, not locally
 						customEnvVarsToPass = undefined;
@@ -1119,6 +1123,8 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					sshRemoteHost: sshRemoteUsed?.host,
 					// SSH stdin script - the entire command is sent via stdin to /bin/bash on remote
 					sshStdinScript,
+					// Human-readable remote agent invocation (shown in Process Details)
+					sshRemoteCommand,
 					// Extra dirs to prepend to spawn PATH (local non-SSH only)
 					extraPathDirs: localAgentBinDir ? [localAgentBinDir] : undefined,
 				});
@@ -1339,6 +1345,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 						command: p.command,
 						args: p.args,
 						maestroEnvVars: p.maestroEnvVars,
+						sshRemoteCommand: p.sshRemoteCommand,
 					};
 					if (p.isTerminal && p.pid) {
 						const children = await getChildProcesses(p.pid);
@@ -1363,6 +1370,7 @@ export function registerProcessHandlers(deps: ProcessHandlerDependencies): void 
 					startTime: cue.startTime,
 					command: cue.command,
 					args: cue.args,
+					sshRemoteCommand: cue.sshRemoteCommand,
 					isCueRun: true,
 					cueRunId: cue.runId,
 					cueSessionName: cue.sessionName,
