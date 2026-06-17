@@ -230,6 +230,7 @@ export function buildProcessTree(input: BuildProcessTreeInput): ProcessNode[] {
 				tabName,
 				childProcesses: proc.childProcesses,
 				maestroEnvVars: proc.maestroEnvVars,
+				sshRemoteCommand: proc.sshRemoteCommand,
 				children: childNodes.length > 0 ? childNodes : undefined,
 			};
 
@@ -339,6 +340,7 @@ export function buildProcessTree(input: BuildProcessTreeInput): ProcessNode[] {
 						command: proc.command,
 						args: proc.args,
 						maestroEnvVars: proc.maestroEnvVars,
+						sshRemoteCommand: proc.sshRemoteCommand,
 					};
 				});
 
@@ -393,6 +395,7 @@ export function buildProcessTree(input: BuildProcessTreeInput): ProcessNode[] {
 				command: proc.command,
 				args: proc.args,
 				maestroEnvVars: proc.maestroEnvVars,
+				sshRemoteCommand: proc.sshRemoteCommand,
 			};
 		});
 
@@ -428,6 +431,7 @@ export function buildProcessTree(input: BuildProcessTreeInput): ProcessNode[] {
 			cueEventType: proc.cueEventType,
 			cueSessionName: proc.cueSessionName,
 			maestroEnvVars: proc.maestroEnvVars,
+			sshRemoteCommand: proc.sshRemoteCommand,
 		}));
 
 		const cueSectionNode: ProcessNode = {

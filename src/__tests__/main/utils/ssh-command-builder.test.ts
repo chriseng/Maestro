@@ -366,6 +366,21 @@ describe('ssh-command-builder', () => {
 			expect(lastArg).toContain('hello world');
 		});
 
+		it('exposes the bare remote agent invocation via remoteCommandLine', async () => {
+			const result = await buildSshCommand(baseConfig, {
+				command: 'claude',
+				args: ['--print', 'hello world'],
+				cwd: '/home/user/project',
+				env: { API_KEY: 'test-key' },
+			});
+
+			// remoteCommandLine is the agent invocation only - no cd/env prefix, no
+			// /bin/bash PATH bootstrap wrapper - for display in Process Details.
+			expect(result.remoteCommandLine).toBe("claude '--print' 'hello world'");
+			expect(result.remoteCommandLine).not.toContain('cd ');
+			expect(result.remoteCommandLine).not.toContain('export PATH=');
+		});
+
 		it('properly formats the SSH command for spawning', async () => {
 			const result = await buildSshCommand(baseConfig, {
 				command: 'claude',
@@ -712,6 +727,19 @@ describe('ssh-command-builder', () => {
 			expect(result.args).toEqual(
 				expect.arrayContaining(['/bin/bash', '--norc', '--noprofile', '-s'])
 			);
+		});
+
+		it('exposes the bare remote agent invocation via remoteCommandLine', async () => {
+			const result = await buildSshCommandWithStdin(baseConfig, {
+				command: 'opencode',
+				args: ['run', '--format', 'json'],
+			});
+
+			// The remote command line is the agent invocation only - no PATH bootstrap,
+			// no `exec` wrapper - so the Process Details modal can show what runs remotely.
+			expect(result.remoteCommandLine).toBe("opencode 'run' '--format' 'json'");
+			expect(result.remoteCommandLine).not.toContain('exec ');
+			expect(result.remoteCommandLine).not.toContain('export PATH=');
 		});
 
 		it('includes PATH setup in stdin script', async () => {

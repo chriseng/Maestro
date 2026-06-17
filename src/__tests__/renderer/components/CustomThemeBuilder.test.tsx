@@ -356,6 +356,66 @@ describe('CustomThemeBuilder', () => {
 				});
 			});
 
+			it('should import a theme that omits the optional bgTitleBar key', async () => {
+				// Older/partial exports may omit the optional bgTitleBar key and
+				// must still import successfully (the UI falls back to bgMain).
+				const colorsWithoutTitleBar = { ...mockThemeColors } as ThemeColors;
+				delete colorsWithoutTitleBar.bgTitleBar;
+
+				render(
+					<CustomThemeBuilder
+						theme={mockTheme}
+						customThemeColors={mockThemeColors}
+						setCustomThemeColors={setCustomThemeColors}
+						customThemeBaseId="dracula"
+						setCustomThemeBaseId={setCustomThemeBaseId}
+						isSelected={false}
+						onSelect={onSelect}
+						onImportError={onImportError}
+						onImportSuccess={onImportSuccess}
+					/>
+				);
+
+				const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+				const file = createFileFromJSON(createValidThemeJSON(colorsWithoutTitleBar));
+				await simulateFileUpload(fileInput, file);
+
+				await waitFor(() => {
+					expect(setCustomThemeColors).toHaveBeenCalledWith(colorsWithoutTitleBar);
+					expect(onImportError).not.toHaveBeenCalled();
+				});
+			});
+
+			it('should reject a theme whose optional bgTitleBar value is invalid', async () => {
+				const colorsWithBadTitleBar = {
+					...mockThemeColors,
+					bgTitleBar: 'not-a-color',
+				};
+
+				render(
+					<CustomThemeBuilder
+						theme={mockTheme}
+						customThemeColors={mockThemeColors}
+						setCustomThemeColors={setCustomThemeColors}
+						customThemeBaseId="dracula"
+						setCustomThemeBaseId={setCustomThemeBaseId}
+						isSelected={false}
+						onSelect={onSelect}
+						onImportError={onImportError}
+						onImportSuccess={onImportSuccess}
+					/>
+				);
+
+				const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+				const file = createFileFromJSON(createValidThemeJSON(colorsWithBadTitleBar));
+				await simulateFileUpload(fileInput, file);
+
+				await waitFor(() => {
+					expect(onImportError).toHaveBeenCalled();
+					expect(setCustomThemeColors).not.toHaveBeenCalled();
+				});
+			});
+
 			it('should accept valid CSS color names', async () => {
 				const namedColors = {
 					...mockThemeColors,

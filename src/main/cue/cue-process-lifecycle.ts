@@ -29,6 +29,8 @@ interface CueActiveProcess {
 	cwd: string;
 	toolType: string;
 	startTime: number;
+	/** For SSH spawns: the agent invocation running on the remote host. */
+	sshRemoteCommand?: string;
 	/** Live ref to the accumulating stdout buffer — filled by the runProcess
 	 *  closure as chunks arrive. Exposed via `getActiveProcessOutput` so the
 	 *  renderer can poll for in-flight logs without a separate subscription
@@ -47,6 +49,8 @@ export interface CueProcessInfo {
 	cwd: string;
 	toolType: string;
 	startTime: number;
+	/** For SSH spawns: the agent invocation running on the remote host. */
+	sshRemoteCommand?: string;
 }
 
 /** Result of a process execution */
@@ -272,6 +276,7 @@ export function runProcess(
 			cwd: spec.cwd,
 			toolType,
 			startTime: Date.now(),
+			sshRemoteCommand: spec.sshRemoteCommand,
 			getStdout: () => stdout,
 			getStderr: () => stderr,
 		});
@@ -414,6 +419,7 @@ export function getProcessList(): CueProcessInfo[] {
 				cwd: entry.cwd,
 				toolType: entry.toolType,
 				startTime: entry.startTime,
+				sshRemoteCommand: entry.sshRemoteCommand,
 			});
 		}
 	}

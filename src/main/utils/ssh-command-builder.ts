@@ -150,6 +150,10 @@ export interface SshCommandResult {
 	stdinScript?: string;
 	/** Remote temp file paths created during image decoding (for informational/logging purposes) */
 	remoteTempImagePaths?: string[];
+	/** Human-readable remote command line (the actual agent invocation that runs on the
+	 *  remote host, without the PATH/version-manager bootstrap or the `exec` wrapper).
+	 *  Surfaced in the Process Details modal above the local SSH command. */
+	remoteCommandLine?: string;
 }
 
 /**
@@ -450,6 +454,10 @@ export async function buildSshCommandWithStdin(
 		cmdParts.push(shellEscape(remoteOptions.prompt));
 	}
 
+	// Capture the bare agent invocation (command + args) for display in Process Details.
+	// This excludes the PATH bootstrap, the `exec` wrapper, and any temp-file cleanup.
+	const remoteCommandLine = cmdParts.join(' ');
+
 	// When remote temp files exist, don't use exec (which replaces the shell) so that
 	// cleanup commands can run after the agent exits. When no temp files, use exec for
 	// a cleaner process tree. When stdinInput is provided, the prompt will be appended
@@ -491,6 +499,7 @@ export async function buildSshCommandWithStdin(
 		args,
 		stdinScript,
 		remoteTempImagePaths: allRemoteTempPaths.length > 0 ? allRemoteTempPaths : undefined,
+		remoteCommandLine,
 	};
 }
 
@@ -686,5 +695,8 @@ export async function buildSshCommand(
 	return {
 		command: sshPath,
 		args,
+		// Bare agent invocation (command + args) for display in Process Details,
+		// without the cd/env prefix or the bash PATH bootstrap wrapper.
+		remoteCommandLine: buildShellCommand(remoteOptions.command, remoteOptions.args),
 	};
 }

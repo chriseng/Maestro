@@ -31,6 +31,8 @@ export interface SpawnSpec {
 	env: Record<string, string>;
 	/** For SSH stdin-script mode: full bash script to send via stdin */
 	sshStdinScript?: string;
+	/** Human-readable remote agent invocation (shown in Process Details for SSH spawns) */
+	sshRemoteCommand?: string;
 	/** For SSH small-prompt mode: raw prompt to send via stdin */
 	stdinPrompt?: string;
 	/** Whether SSH remote execution was actually used */
@@ -139,6 +141,7 @@ export async function buildSpawnSpec(
 	// at the end of the function already handles the undefined case via `|| {}`.
 	let spawnEnvVars: Record<string, string> | undefined = effectiveEnvVars;
 	let sshStdinScript: string | undefined;
+	let sshRemoteCommand: string | undefined;
 	let stdinPrompt: string | undefined;
 	let sshRemoteUsed: SpawnSpec['sshRemoteUsed'];
 
@@ -220,6 +223,7 @@ export async function buildSpawnSpec(
 		spawnCwd = sshResult.cwd;
 		spawnEnvVars = sshResult.customEnvVars;
 		sshStdinScript = sshResult.sshStdinScript;
+		sshRemoteCommand = sshResult.sshRemoteCommand;
 		stdinPrompt = sshResult.prompt;
 
 		if (sshResult.sshRemoteUsed) {
@@ -279,6 +283,7 @@ export async function buildSpawnSpec(
 				...(spawnEnvVars || {}),
 			} as Record<string, string>,
 			sshStdinScript,
+			sshRemoteCommand,
 			stdinPrompt,
 			sshRemoteUsed,
 		},

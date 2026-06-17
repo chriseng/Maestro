@@ -45,6 +45,9 @@ describe('ProcessDetailView', () => {
 		expect(screen.getByText('claude-code')).toBeInTheDocument();
 		expect(screen.getByText('/Users/test/project')).toBeInTheDocument();
 		expect(screen.getByText('/usr/bin/claude --no-color chat')).toBeInTheDocument();
+		// Local process: command tile labeled "Command Line", no Remote Command tile.
+		expect(screen.getByText('Command Line')).toBeInTheDocument();
+		expect(screen.queryByText('Remote Command')).not.toBeInTheDocument();
 	});
 
 	it('hides optional fields when not provided', () => {
@@ -55,6 +58,31 @@ describe('ProcessDetailView', () => {
 		expect(screen.queryByText('Tab Name')).not.toBeInTheDocument();
 		expect(screen.queryByText('Cue Subscription')).not.toBeInTheDocument();
 		expect(screen.queryByText('AUTO RUN')).not.toBeInTheDocument();
+		expect(screen.queryByText('Remote Command')).not.toBeInTheDocument();
+	});
+
+	it('shows the remote agent command above the SSH command for SSH spawns', () => {
+		render(
+			<ProcessDetailView
+				theme={theme}
+				detail={{
+					...baseDetail,
+					command: '/usr/bin/ssh',
+					args: ['-o', 'BatchMode=yes', 'host', '/bin/bash', '--norc', '--noprofile', '-s'],
+					sshRemoteCommand: "claude '--print' '--output-format' 'stream-json'",
+				}}
+				onBack={() => {}}
+				onClose={() => {}}
+			/>
+		);
+		// Remote agent invocation is surfaced...
+		expect(screen.getByText('Remote Command')).toBeInTheDocument();
+		expect(
+			screen.getByText("claude '--print' '--output-format' 'stream-json'")
+		).toBeInTheDocument();
+		// ...and the local SSH wrapper tile is relabeled "SSH Command".
+		expect(screen.getByText('SSH Command')).toBeInTheDocument();
+		expect(screen.queryByText('Command Line')).not.toBeInTheDocument();
 	});
 
 	it('renders Cue-specific fields when present', () => {

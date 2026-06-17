@@ -81,6 +81,7 @@ export function ProcessMonitor(props: ProcessMonitorProps) {
 			tabName: node.tabName,
 			childProcesses: node.childProcesses,
 			maestroEnvVars: node.maestroEnvVars,
+			sshRemoteCommand: node.sshRemoteCommand,
 		});
 	}, []);
 

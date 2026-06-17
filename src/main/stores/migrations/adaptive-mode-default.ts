@@ -2,8 +2,11 @@
  * Adaptive Mode Default Migration
  *
  * One-shot backfill that turns Adaptive Mode (`enableMaestroP`) on for every
- * existing Claude Code agent, matching the new "default on for new agents"
- * behavior (see `isAdaptiveModeDefaultOn` in `src/shared/agentConstants.ts`).
+ * existing Claude Code agent that has NEVER configured a token source, matching
+ * the new "default on for new agents" behavior (see `isAdaptiveModeDefaultOn`
+ * in `src/shared/agentConstants.ts`). Agents with an explicit `false` (the user
+ * deliberately picked the API token source) are left untouched - flipping them
+ * on would silently revert their choice to Dynamic.
  *
  * Idempotent via a marker in the settings store — once the marker is set the
  * migration never runs again, so a user who later turns Adaptive Mode off on a
@@ -34,7 +37,11 @@ export function migrateAdaptiveModeDefault(store: Store<MaestroSettings>): void 
 
 	let updated = 0;
 	const nextSessions = sessions.map((session) => {
-		if (isAdaptiveModeDefaultOn(session.toolType) && session.enableMaestroP !== true) {
+		// Only backfill the NEVER-CONFIGURED state (`undefined`). An explicit
+		// `false` means the user deliberately picked API as their token source -
+		// forcing Adaptive Mode back on would silently revert their choice to
+		// Dynamic on the next app launch. `!== true` would wrongly catch both.
+		if (isAdaptiveModeDefaultOn(session.toolType) && session.enableMaestroP === undefined) {
 			updated++;
 			return { ...session, enableMaestroP: true };
 		}

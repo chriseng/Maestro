@@ -38,6 +38,7 @@ export const mockThemeColors: ThemeColors = {
 	bgMain: '#282a36',
 	bgSidebar: '#21222c',
 	bgActivity: '#343746',
+	bgTitleBar: '#191a21',
 	border: '#44475a',
 	textMain: '#f8f8f2',
 	textDim: '#6272a4',

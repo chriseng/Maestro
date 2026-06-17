@@ -44,6 +44,8 @@ export interface IProcessManager {
 		sendPromptViaStdinRaw?: boolean;
 		/** Script to send via stdin for SSH execution (bypasses shell escaping) */
 		sshStdinScript?: string;
+		/** Human-readable remote agent invocation (shown in Process Details for SSH spawns) */
+		sshRemoteCommand?: string;
 	}): { pid: number; success: boolean };
 
 	write(sessionId: string, data: string): boolean;

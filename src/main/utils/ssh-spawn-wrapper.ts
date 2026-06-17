@@ -56,6 +56,8 @@ export interface SshSpawnWrapResult {
 	prompt?: string;
 	/** Script to send via stdin for SSH execution (includes PATH setup + prompt passthrough) */
 	sshStdinScript?: string;
+	/** Human-readable remote agent invocation (shown in Process Details above the SSH command) */
+	sshRemoteCommand?: string;
 	/** Whether SSH remote was used */
 	sshRemoteUsed: SshRemoteConfig | null;
 }
@@ -163,6 +165,7 @@ export async function wrapSpawnWithSsh(
 			customEnvVars: undefined,
 			prompt: undefined,
 			sshStdinScript: sshCommand.stdinScript,
+			sshRemoteCommand: sshCommand.remoteCommandLine,
 			sshRemoteUsed: sshResult.config,
 		};
 	}
@@ -200,6 +203,7 @@ export async function wrapSpawnWithSsh(
 		cwd: os.homedir(),
 		customEnvVars: undefined,
 		prompt: undefined,
+		sshRemoteCommand: sshCommand.remoteCommandLine,
 		sshRemoteUsed: sshResult.config,
 	};
 }

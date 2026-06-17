@@ -28,6 +28,8 @@ export interface ActiveProcess {
 	childProcesses?: Array<{ pid: number; command: string }>;
 	/** Env vars Maestro is explicitly setting on this process (global + agent + session overrides). */
 	maestroEnvVars?: Record<string, string>;
+	/** For SSH spawns: the agent invocation running on the remote host. */
+	sshRemoteCommand?: string;
 }
 
 export type ProcessTypeTag =
@@ -71,6 +73,8 @@ export interface ProcessNode {
 	tabName?: string;
 	childProcesses?: Array<{ pid: number; command: string }>;
 	maestroEnvVars?: Record<string, string>;
+	/** For SSH spawns: the agent invocation running on the remote host. */
+	sshRemoteCommand?: string;
 }
 
 export interface ProcessDetailData {
@@ -92,4 +96,6 @@ export interface ProcessDetailData {
 	tabName?: string;
 	childProcesses?: Array<{ pid: number; command: string }>;
 	maestroEnvVars?: Record<string, string>;
+	/** For SSH spawns: the agent invocation running on the remote host. */
+	sshRemoteCommand?: string;
 }

@@ -33,12 +33,15 @@ describe('migrateAdaptiveModeDefault', () => {
 		vi.clearAllMocks();
 	});
 
-	it('enables Adaptive Mode on existing Claude Code agents and leaves others untouched', () => {
+	it('backfills only never-configured Claude Code agents, preserving explicit choices and other agents', () => {
 		const sessionsStore = makeStore({
 			sessions: [
 				{ id: 'a', toolType: 'claude-code', name: 'Claude' },
 				{ id: 'b', toolType: 'codex', name: 'Codex' },
 				{ id: 'c', toolType: 'claude-code', name: 'Already on', enableMaestroP: true },
+				// Explicit API choice (false) must survive the backfill - flipping it
+				// on would silently revert the user's token source to Dynamic.
+				{ id: 'd', toolType: 'claude-code', name: 'Picked API', enableMaestroP: false },
 			],
 		});
 		mockedGetSessionsStore.mockReturnValue(sessionsStore as any);
@@ -51,7 +54,24 @@ describe('migrateAdaptiveModeDefault', () => {
 			{ id: 'a', toolType: 'claude-code', name: 'Claude', enableMaestroP: true },
 			{ id: 'b', toolType: 'codex', name: 'Codex' },
 			{ id: 'c', toolType: 'claude-code', name: 'Already on', enableMaestroP: true },
+			{ id: 'd', toolType: 'claude-code', name: 'Picked API', enableMaestroP: false },
 		]);
+		expect(settingsStore.data[ADAPTIVE_MODE_DEFAULT_MIGRATION_MARKER]).toBe(true);
+	});
+
+	it('sets the marker without writing sessions when every agent already has an explicit choice', () => {
+		const sessionsStore = makeStore({
+			sessions: [
+				{ id: 'c', toolType: 'claude-code', name: 'On', enableMaestroP: true },
+				{ id: 'd', toolType: 'claude-code', name: 'API', enableMaestroP: false },
+			],
+		});
+		mockedGetSessionsStore.mockReturnValue(sessionsStore as any);
+		const settingsStore = makeStore();
+
+		migrateAdaptiveModeDefault(settingsStore as any);
+
+		expect(sessionsStore.set).not.toHaveBeenCalled();
 		expect(settingsStore.data[ADAPTIVE_MODE_DEFAULT_MIGRATION_MARKER]).toBe(true);
 	});
 
