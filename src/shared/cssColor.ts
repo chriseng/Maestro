@@ -1,11 +1,12 @@
 /**
  * Deterministic CSS color validation.
  *
- * Previously theme-import validation relied on a DOM round-trip
- * (`new Option().style.color = value`), which is non-deterministic across
- * environments: jsdom's CSS parser accepts/rejects values differently than
- * Chromium and even varies under load on CI. This pure validator behaves
- * identically everywhere - production, local tests, and CI.
+ * Theme-import validation previously relied on a DOM round-trip
+ * (`new Option().style.color = value`), which is non-deterministic: jsdom's CSS
+ * parser behaves differently than Chromium, and in tests it is corrupted when
+ * a sibling test spies on `document.createElement` (the round-trip then rejects
+ * every color). This pure validator behaves identically everywhere -
+ * production, local tests, and CI - with no DOM dependency.
  *
  * Supported forms: hex (#RGB, #RGBA, #RRGGBB, #RRGGBBAA), rgb()/rgba(),
  * hsl()/hsla(), and CSS named colors (CSS Color Module Level 4).

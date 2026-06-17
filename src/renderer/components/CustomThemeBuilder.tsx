@@ -365,8 +365,12 @@ export function CustomThemeBuilder({
 				try {
 					const data = JSON.parse(e.target?.result as string);
 					if (data.colors && typeof data.colors === 'object') {
-						// Validate all required color keys exist
-						const requiredKeys = COLOR_CONFIG.map((c) => c.key);
+						// Validate all required color keys exist. bgTitleBar is
+						// optional (older/partial theme exports may omit it; the UI
+						// falls back to bgMain), so it must not be required here.
+						const requiredKeys = COLOR_CONFIG.map((c) => c.key).filter(
+							(key) => key !== 'bgTitleBar'
+						);
 						const hasAllKeys = requiredKeys.every((key) => key in data.colors);
 
 						if (!hasAllKeys) {
@@ -376,8 +380,10 @@ export function CustomThemeBuilder({
 							return;
 						}
 
-						// Validate all color values are valid CSS colors
-						const invalidColors = requiredKeys.filter((key) => !isValidCssColor(data.colors[key]));
+						// Validate color values for every key that is present (including
+						// the optional bgTitleBar when supplied).
+						const presentKeys = COLOR_CONFIG.map((c) => c.key).filter((key) => key in data.colors);
+						const invalidColors = presentKeys.filter((key) => !isValidCssColor(data.colors[key]));
 						if (invalidColors.length > 0) {
 							const errorMsg = `Invalid theme file: invalid color values for ${invalidColors.slice(0, 3).join(', ')}${invalidColors.length > 3 ? '...' : ''}`;
 							onImportError?.(errorMsg);
