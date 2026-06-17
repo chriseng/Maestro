@@ -18,6 +18,7 @@
 import { Command } from 'commander';
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
+import * as fs from 'node:fs';
 import * as os from 'os';
 import * as path from 'path';
 
@@ -654,6 +655,10 @@ async function statusMode(args: ParsedArgs): Promise<never> {
 		args: args.passThroughArgs,
 		cwd,
 		env: sanitizeChildEnv(),
+		// Parse the /usage panel from the full raw screen, not the `\n`-delimited
+		// 'line' events: heavier panels paint via cursor-addressing with no line
+		// feeds, so the 'line' stream is empty and the content would be lost.
+		captureScreen: true,
 	});
 
 	const lines: string[] = [];
@@ -694,7 +699,30 @@ async function statusMode(args: ParsedArgs): Promise<never> {
 		}
 	}
 
-	const raw = lines.join('\n');
+	// Parse from the full raw screen capture, not the `\n`-delimited 'line'
+	// events: heavier /usage panels (Team/Enterprise accounts, or any account
+	// with a long "what's contributing" breakdown) paint via cursor-addressing
+	// with no line feeds, leaving the 'line' stream empty. The screen capture is
+	// a superset that always carries the panel; fall back to the joined lines
+	// only if capture was somehow empty.
+	const raw = driver.getScreenCapture() || lines.join('\n');
+
+	// Diagnostic hook: when MAESTRO_P_DUMP_RAW points at a file, write the raw
+	// captured screen there before parsing. The /usage layout drifts by plan
+	// type (personal Max vs Team/Enterprise vs API-billing), and parse failures
+	// are screen-only — there's no transcript to inspect after the fact. This
+	// lets a maintainer capture the exact panel a given account renders without
+	// rebuilding an instrumented binary. Best-effort: a write failure must never
+	// derail the status probe itself.
+	const dumpPath = process.env.MAESTRO_P_DUMP_RAW;
+	if (dumpPath) {
+		try {
+			fs.writeFileSync(dumpPath, raw, 'utf8');
+		} catch {
+			// ignore — diagnostics are non-fatal
+		}
+	}
+
 	const parsed = parseUsage(raw, new Date().toISOString(), configDir);
 	statusFinalized = true;
 	if (parsed) {

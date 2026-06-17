@@ -82,6 +82,17 @@ describe('parseUsage / fixtures', () => {
 	it('parses a real /usage capture from the smash account (compound session row with intact 3:50am)', () => {
 		runFixture('usage-smash-2026-05-15');
 	});
+
+	// Heavier panels (Team/Enterprise accounts, or any account with a long
+	// "what's contributing" breakdown) paint entirely via cursor-addressing
+	// with no line feeds, so the ANSI-stripped capture collapses into one glued
+	// blob carrying multiple repaints. The parser must re-segment the sections
+	// AND parse only the final (settled) paint — here the provisional first
+	// paint shows session 99% and a week(all) row with no Resets line yet, while
+	// the settled paint shows 100% / 44% / 23% with full reset timestamps.
+	it('parses a cursor-addressed glued panel with no newlines, isolating the final repaint', () => {
+		runFixture('usage-glued-no-newlines');
+	});
 });
 
 describe('parseUsage / behavioral guards', () => {

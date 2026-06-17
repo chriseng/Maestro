@@ -34,6 +34,14 @@ export interface TuiDriverOptions {
 	env: NodeJS.ProcessEnv;
 	cols?: number;
 	rows?: number;
+	// --status only: accumulate the full raw PTY stream so the /usage panel can
+	// be parsed from the complete screen rather than the `\n`-delimited 'line'
+	// events. Claude paints heavier /usage panels (Team/Enterprise accounts, or
+	// any account with a long "what's contributing" breakdown) entirely via
+	// cursor-addressing with NO line feeds, so the 'line' stream stays empty and
+	// the content sits unflushed in lineBuffer until exit. Off by default: run
+	// mode never reads the screen and must not pay the unbounded-buffer cost.
+	captureScreen?: boolean;
 }
 
 export const DEFAULT_COLS = 200;
@@ -159,6 +167,8 @@ export class TuiDriver extends EventEmitter {
 
 	private rollingBuffer = '';
 	private lineBuffer = '';
+	/** Full raw PTY accumulator for --status parsing. Populated only when options.captureScreen is set. */
+	private screenCapture = '';
 	private readyEmitted = false;
 	private limitEmitted = false;
 	private trustHandled = false;
@@ -347,6 +357,13 @@ export class TuiDriver extends EventEmitter {
 		return this.rollingBuffer.slice(-maxBytes);
 	}
 
+	// Full raw PTY stream captured since start(). Empty unless options.captureScreen
+	// was set. statusMode parses the /usage panel from this so cursor-addressed
+	// (newline-free) panels are not lost to the `\n`-delimited 'line' stream.
+	getScreenCapture(): string {
+		return this.screenCapture;
+	}
+
 	async quit(): Promise<void> {
 		if (!this.ptyProcess || this.exited) return;
 		try {
@@ -392,6 +409,13 @@ export class TuiDriver extends EventEmitter {
 
 	private handleData(data: string): void {
 		if (this.exited) return;
+		// --status capture: keep the full raw stream so statusMode can parse the
+		// /usage panel from the complete screen. Cursor-addressed panels carry no
+		// line feeds, so the 'line' events below never fire and only this buffer
+		// holds the panel content. Run mode leaves captureScreen unset.
+		if (this.options.captureScreen) {
+			this.screenCapture += data;
+		}
 		const stripped = stripAnsiCodes(data);
 		if (stripped.length === 0) return;
 

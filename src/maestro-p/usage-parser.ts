@@ -130,6 +130,32 @@ const NOT_LOGGED_IN_RE = /notloggedin/;
 // Inline-scan fallback for percent + first-3-lines reset search.
 const INLINE_SCAN_LINE_COUNT = 3;
 
+// Panel re-segmentation for cursor-addressed (newline-free) captures.
+//
+// Light /usage panels paint with real line feeds, so splitting on `\n` yields
+// one row per line. Heavier panels (Team/Enterprise accounts, or any account
+// with a long "what's contributing to your usage" breakdown) are painted
+// ENTIRELY via cursor-positioning escapes with NO line feeds at all. After
+// ANSI-stripping, the cursor moves vanish and the rows collapse into a single
+// glued blob:
+//   "…100%usedResets 2:10pm (America/Chicago)Current week (all models)…43%used…"
+// The line-oriented section logic below then sees every header on one "line"
+// and can't window them apart.
+//
+// Inserting a newline before each section header and each "Resets" run
+// restores one-row-per-line structure so the existing windowing works
+// unchanged. On panels that already carry real line feeds this only inserts a
+// harmless blank split ahead of rows that were already on their own line —
+// `getSectionWindow` slices from the header line either way. The compound
+// session row whose "Resets" decayed to "Reses" (see RESET_SPEC_BODY) has no
+// matchable "Resets" token, so it stays glued and is still recovered by the
+// session inline-scan, exactly as before.
+const PANEL_SEGMENT_RE = /(?=Current\s*session|Current\s*week\s*\(|Resets)/gi;
+
+function segmentGluedPanel(stripped: string): string {
+	return stripped.replace(PANEL_SEGMENT_RE, '\n');
+}
+
 interface SectionMarker {
 	kind: 'session' | 'week_all_models' | 'week_sonnet_only';
 	startIndex: number;
@@ -142,7 +168,23 @@ interface SectionExtract {
 
 export function parseUsage(raw: string, nowIso: string, configDir: string): StatusSnapshot | null {
 	const stripped = stripAnsiCodes(raw);
-	const lines = stripped.split(/\r?\n/);
+	// Restore one-row-per-line structure for cursor-addressed panels that
+	// stripped down to a single glued blob; a no-op on panels already
+	// carrying real line feeds. See segmentGluedPanel.
+	const allLines = segmentGluedPanel(stripped).split(/\r?\n/);
+
+	// The full-screen capture holds EVERY repaint of the panel, not just the
+	// final one: claude paints "Current session" first with provisional numbers
+	// (e.g. 101% before it settles to 100%), then repaints as "Scanning local
+	// sessions… → Refreshing… → done". Parsing the accumulation lets an early,
+	// half-loaded paint win the first-sighting marker race, so percentages come
+	// out stale and a week section whose "Resets …" hadn't painted yet borrows
+	// the session's reset. Restrict parsing to the LAST paint by slicing from the
+	// final "Current session" header — that paint is the settled one (the
+	// debounce waits for the stream to go quiet before we read). On single-paint
+	// captures (the common case, and every `\n`-delimited fixture) the last
+	// occurrence is the only one, so this is a no-op.
+	const lines = sliceToFinalPanel(allLines);
 
 	// "Not logged in" detection runs first: when the active config dir has no
 	// tokens, claude paints a status bar with `Not logged in · Run /login`
@@ -203,6 +245,20 @@ export function parseUsage(raw: string, nowIso: string, configDir: string): Stat
 
 function compressedKey(line: string): string {
 	return line.replace(/\s+/g, '').toLowerCase();
+}
+
+// Keep only the final paint of the panel. Each repaint opens with a fresh
+// "Current session" header, painted in order session → week(all) → week(sonnet),
+// so the last such header marks the start of the settled paint and everything
+// after it is that paint's data. Returns the input unchanged when no session
+// header is present (the section extractors then fail cleanly, as before) or
+// when the header appears exactly once.
+function sliceToFinalPanel(lines: string[]): string[] {
+	let lastSessionIdx = -1;
+	for (let i = 0; i < lines.length; i++) {
+		if (SESSION_HEADER_RE.test(compressedKey(lines[i]))) lastSessionIdx = i;
+	}
+	return lastSessionIdx <= 0 ? lines : lines.slice(lastSessionIdx);
 }
 
 function findSectionMarkers(lines: string[]): SectionMarker[] {
